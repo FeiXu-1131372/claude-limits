@@ -2,7 +2,6 @@ import {
   type HTMLAttributes,
   forwardRef,
   useState,
-  useId,
   type ReactNode,
   Children,
   isValidElement,
@@ -51,7 +50,7 @@ function TabsComponent({
         if (!isValidElement(child)) return child;
         if (child.type === TabList) {
           return cloneElement(child as React.ReactElement<TabListProps>, {
-            children: Children.map(child.props.children, (tab) => {
+            children: Children.map((child.props as { children: ReactNode }).children, (tab) => {
               if (!isValidElement<TabProps>(tab) || tab.type !== Tab) return tab;
               return cloneElement(tab, {
                 active: tab.props.id === activeTab,

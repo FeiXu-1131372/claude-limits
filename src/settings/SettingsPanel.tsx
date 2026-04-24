@@ -5,7 +5,7 @@ import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { useStore } from '../lib/store';
-import { IconRefresh, IconLogOut } from '../lib/icons';
+import { LogOut } from '../lib/icons';
 
 export function SettingsPanel() {
   const settings = useStore((s) => s.settings);
@@ -99,7 +99,7 @@ export function SettingsPanel() {
               <Badge variant="live">OAuth</Badge>
             </div>
             <Button variant="ghost" size="sm" className="text-[var(--color-danger)]">
-              <IconLogOut size={12} />
+              <LogOut size={12} />
               Sign out
             </Button>
           </div>

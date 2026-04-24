@@ -55,7 +55,7 @@ export function ModelsTab() {
       <div className="flex items-center justify-center py-[var(--space-lg)]">
         <div className="relative">
           <svg width="140" height="140" viewBox="0 0 140 140">
-            {segments.map((seg, i) => {
+            {segments.map((seg) => {
               const strokeLength = (seg.pct / 100) * circumference;
               const offset = accumulatedOffset;
               accumulatedOffset += strokeLength;

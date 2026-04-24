@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Tabs } from '../components/ui/Tabs';
 import { Badge } from '../components/ui/Badge';
 import { IconButton } from '../components/ui/IconButton';
 import { SessionsTab } from './SessionsTab';

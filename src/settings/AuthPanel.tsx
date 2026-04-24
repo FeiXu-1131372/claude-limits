@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { IconButton } from '../components/ui/IconButton';
 import { fadeIn } from '../lib/motion';
-import { IconAuth, IconRefresh, IconExternalLink } from '../lib/icons';
+import { IconAuth, IconRefresh, ExternalLink } from '../lib/icons';
 
 type AuthMethod = 'oauth' | 'local' | null;
 
@@ -60,7 +58,7 @@ export function AuthPanel() {
               className="w-full flex items-center gap-[var(--space-sm)] text-left"
             >
               <div className="w-[32px] h-[32px] rounded-[var(--radius-sm)] bg-[var(--color-accent-dim)] flex items-center justify-center shrink-0">
-                <IconExternalLink size={14} className="text-[var(--color-accent)]" />
+                <ExternalLink size={14} className="text-[var(--color-accent)]" />
               </div>
               <div className="flex flex-col gap-[2px] flex-1">
                 <span className="text-[var(--text-body)] font-[var(--weight-medium)] text-[var(--color-text)]">

@@ -9,7 +9,7 @@ import { useStore } from './lib/store';
 type View = 'popover' | 'report' | 'settings' | 'auth';
 
 export function App() {
-  const [view, setView] = useState<View>('popover');
+  const [view, _setView] = useState<View>('popover');
   const authState = useStore((s) => s.authState);
 
   const currentView = authState === 'unauthenticated' ? 'auth' : view;

@@ -41,8 +41,6 @@ export function TrendsTab() {
 
   const maxValue = Math.max(...visibleData.map((d) => d.tokens), 1);
   const chartHeight = 160;
-  const barWidth = 100 / visibleData.length;
-
   return (
     <div className="flex flex-col gap-[var(--space-md)]">
       {/* Range selector */}
@@ -69,7 +67,7 @@ export function TrendsTab() {
       {/* Chart */}
       <Card className="p-[var(--space-md)]">
         <div className="flex items-end gap-[2px]" style={{ height: chartHeight }}>
-          {visibleData.map((day, i) => {
+          {visibleData.map((day) => {
             const heightPct = (day.tokens / maxValue) * 100;
             const fivePct = day.five_hour_pct;
             const isWarn = fivePct >= 75 && fivePct < 90;
