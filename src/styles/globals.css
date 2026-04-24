@@ -1,0 +1,97 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+/* ─── Reset ─── */
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-bg-base);
+  line-height: var(--leading-body);
+}
+
+/* ─── Glass mixin (applied to translucent surfaces) ─── */
+
+.glass {
+  background: var(--color-bg-surface);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--color-border-subtle);
+}
+
+.glass::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  right: -15%;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, var(--glass-tint) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ─── Scrollbar ─── */
+
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-hover);
+}
+
+/* ─── Selection ─── */
+
+::selection {
+  background: var(--color-accent-dim);
+  color: var(--color-accent);
+}
+
+/* ─── Focus visible ─── */
+
+:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Reduced motion ─── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: var(--duration-instant) !important;
+    transition-duration: var(--duration-instant) !important;
+  }
+}
+
+/* ─── Monospace utility ─── */
+
+.mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum';
+}

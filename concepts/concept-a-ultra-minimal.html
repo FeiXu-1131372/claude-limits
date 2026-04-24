@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Concept A — Ultra Minimal</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    /* Anthropic warm palette */
+    --bg-base: #1a1714;
+    --bg-surface: rgba(38, 34, 30, 0.72);
+    --bg-surface-hover: rgba(48, 43, 38, 0.8);
+    --border-subtle: rgba(255, 235, 210, 0.06);
+    --border-soft: rgba(255, 235, 210, 0.1);
+
+    --text-primary: rgba(255, 248, 240, 0.92);
+    --text-secondary: rgba(255, 235, 210, 0.5);
+    --text-muted: rgba(255, 235, 210, 0.3);
+
+    --accent: #2dd4bf;
+    --accent-dim: rgba(45, 212, 191, 0.15);
+
+    --safe: #34d399;
+    --safe-dim: rgba(52, 211, 153, 0.12);
+    --warn: #fb923c;
+    --warn-dim: rgba(251, 146, 60, 0.12);
+    --danger: #f87171;
+    --danger-dim: rgba(248, 113, 113, 0.12);
+
+    --track: rgba(255, 235, 210, 0.06);
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-pill: 100px;
+
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
+
+    --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0e0c0a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .popover {
+    width: 360px;
+    height: 420px;
+    background: var(--bg-surface);
+    backdrop-filter: blur(40px) saturate(1.4);
+    -webkit-backdrop-filter: blur(40px) saturate(1.4);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 28px 24px 20px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Subtle warm ambient glow */
+  .popover::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    right: -20%;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(251, 146, 60, 0.04) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+  }
+
+  .header-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .header-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--safe);
+    opacity: 0.7;
+  }
+
+  /* Main metric area — the hero */
+  .metrics {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .metric-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .metric-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .metric-label {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
+  }
+
+  .metric-value {
+    font-family: var(--font-mono);
+    font-size: 28px;
+    font-weight: 500;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  .metric-value.warn { color: var(--warn); }
+  .metric-value.danger { color: var(--danger); }
+
+  .metric-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 2px;
+  }
+
+  .metric-timer {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  /* Progress bar — ultra thin, wide */
+  .bar-track {
+    width: 100%;
+    height: 3px;
+    background: var(--track);
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: var(--radius-pill);
+    transition: width 0.8s var(--spring);
+  }
+
+  .bar-fill.safe {
+    background: linear-gradient(90deg, var(--safe), var(--accent));
+  }
+
+  .bar-fill.warn {
+    background: linear-gradient(90deg, var(--accent), var(--warn));
+  }
+
+  .bar-fill.danger {
+    background: linear-gradient(90deg, var(--warn), var(--danger));
+  }
+
+  /* Model breakdown — single row of tiny pills */
+  .models {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .model-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .model-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+  }
+
+  .model-dot.opus { background: var(--accent); }
+  .model-dot.sonnet { background: var(--warn); }
+  .model-dot.haiku { background: var(--safe); }
+
+  .model-name {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .model-pct {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+  }
+
+  /* Footer */
+  .footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+    padding-top: 16px;
+  }
+
+  .footer-time {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .footer-link {
+    font-size: 11px;
+    color: var(--accent);
+    text-decoration: none;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    background: none;
+    border: none;
+    padding: 4px 8px;
+    margin: -4px -8px;
+    border-radius: var(--radius-sm);
+  }
+
+  .footer-link:hover {
+    background: var(--accent-dim);
+  }
+
+  .footer-link:active {
+    opacity: 0.7;
+  }
+</style>
+</head>
+<body>
+  <div class="popover">
+    <div class="header">
+      <span class="header-title">Claude</span>
+      <span class="header-dot"></span>
+    </div>
+
+    <div class="metrics">
+      <!-- 5-hour window — 68% used -->
+      <div class="metric-row">
+        <div class="metric-header">
+          <span class="metric-label">5h window</span>
+          <span class="metric-value">68%</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill safe" style="width: 68%"></div>
+        </div>
+        <div class="metric-meta">
+          <span class="metric-timer">Resets in 1h 42m</span>
+        </div>
+      </div>
+
+      <!-- 7-day window — 81% used (warning) -->
+      <div class="metric-row">
+        <div class="metric-header">
+          <span class="metric-label">7d window</span>
+          <span class="metric-value warn">81%</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill warn" style="width: 81%"></div>
+        </div>
+        <div class="metric-meta">
+          <span class="metric-timer">Resets in 3d 14h</span>
+        </div>
+      </div>
+
+      <!-- Model breakdown -->
+      <div class="models">
+        <div class="model-pill">
+          <span class="model-dot opus"></span>
+          <span class="model-name">Opus</span>
+          <span class="model-pct">42%</span>
+        </div>
+        <div class="model-pill">
+          <span class="model-dot sonnet"></span>
+          <span class="model-name">Sonnet</span>
+          <span class="model-pct">31%</span>
+        </div>
+        <div class="model-pill">
+          <span class="model-dot haiku"></span>
+          <span class="model-name">Haiku</span>
+          <span class="model-pct">8%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="footer-time">Updated 2m ago</span>
+      <button class="footer-link">See details</button>
+    </div>
+  </div>
+</body>
+</html>
