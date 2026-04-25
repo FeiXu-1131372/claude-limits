@@ -1,0 +1,3 @@
+{"ts":"2026-04-20T10:00:00Z","project":"demo-a","model":"claude-sonnet-4-6-20260301","input_tokens":1000,"output_tokens":500,"cache_read_tokens":200,"cache_creation_5m_tokens":100,"cache_creation_1h_tokens":0,"cost_usd":0.012}
+{"ts":"2026-04-20T10:05:12Z","project":"demo-a","model":"claude-opus-4-7-20260115","input_tokens":500,"output_tokens":1500,"cache_read_tokens":0,"cache_creation_5m_tokens":0,"cache_creation_1h_tokens":0,"cost_usd":0.119}
+{"ts":"2026-04-20T11:14:22Z","project":"demo-b","model":"claude-haiku-4-5-20260201","input_tokens":200,"output_tokens":100,"cache_read_tokens":0,"cache_creation_5m_tokens":0,"cache_creation_1h_tokens":0,"cost_usd":0.0007}

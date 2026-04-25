@@ -1,0 +1,2 @@
+{"ts":"2025-11-10T14:00:00Z","project":"legacy","model":"claude-opus-4-20250901","input_tokens":1234,"output_tokens":2345,"extra_old_field":"ignored","deprecated_flag":true}
+{"ts":"2025-12-15T09:30:00Z","project":"legacy","model":"claude-sonnet-4-20251001","input_tokens":100,"output_tokens":200}

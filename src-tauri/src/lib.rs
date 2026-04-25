@@ -2,7 +2,7 @@ mod logging;
 mod store;
 pub mod usage_api;
 pub mod auth;
-mod jsonl_parser;
+pub mod jsonl_parser;
 mod notifier;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
