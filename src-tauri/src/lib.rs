@@ -72,6 +72,13 @@ pub fn run() {
             #[cfg(debug_assertions)]
             commands::debug_force_threshold,
         ])
+        .setup(|app| {
+            use tauri::Manager;
+            let handle = app.handle().clone();
+            let state: Arc<AppState> = app.state::<Arc<AppState>>().inner().clone();
+            poll_loop::spawn(handle, state);
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
