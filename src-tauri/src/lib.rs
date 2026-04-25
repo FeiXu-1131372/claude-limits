@@ -35,6 +35,37 @@ pub fn run() {
         fallback_dir: data_dir.clone(),
     });
 
+    let specta_builder = tauri_specta::Builder::<tauri::Wry>::new()
+        .commands(tauri_specta::collect_commands![
+            commands::get_current_usage,
+            commands::get_session_history,
+            commands::get_daily_trends,
+            commands::get_model_breakdown,
+            commands::get_project_breakdown,
+            commands::get_cache_stats,
+            commands::start_oauth_flow,
+            commands::submit_oauth_code,
+            commands::use_claude_code_creds,
+            commands::pick_auth_source,
+            commands::sign_out,
+            commands::has_claude_code_creds,
+            commands::update_settings,
+            commands::get_settings,
+        ]);
+
+    #[cfg(debug_assertions)]
+    let specta_builder =
+        specta_builder.commands(tauri_specta::collect_commands![commands::debug_force_threshold,]);
+
+    #[cfg(debug_assertions)]
+    specta_builder
+        .export(
+            specta_typescript::Typescript::default()
+                .bigint(specta_typescript::BigIntExportBehavior::Number),
+            "../src/lib/generated/bindings.ts",
+        )
+        .expect("failed to export specta bindings");
+
     tauri::Builder::default()
         .manage(app_state)
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
@@ -54,24 +85,7 @@ pub fn run() {
             None,
         ))
         .plugin(tauri_plugin_window_state::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![
-            commands::get_current_usage,
-            commands::get_session_history,
-            commands::get_daily_trends,
-            commands::get_model_breakdown,
-            commands::get_project_breakdown,
-            commands::get_cache_stats,
-            commands::start_oauth_flow,
-            commands::submit_oauth_code,
-            commands::use_claude_code_creds,
-            commands::pick_auth_source,
-            commands::sign_out,
-            commands::has_claude_code_creds,
-            commands::update_settings,
-            commands::get_settings,
-            #[cfg(debug_assertions)]
-            commands::debug_force_threshold,
-        ])
+        .invoke_handler(specta_builder.invoke_handler())
         .setup(|app| {
             use tauri::Manager;
             let handle = app.handle().clone();

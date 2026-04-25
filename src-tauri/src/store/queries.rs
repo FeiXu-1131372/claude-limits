@@ -4,15 +4,16 @@ use chrono::{DateTime, Utc};
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct StoredAccount {
     pub id: String,
     pub email: String,
     pub display_name: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct StoredSessionEvent {
+    #[specta(type = String)]
     pub ts: DateTime<Utc>,
     pub project: String,
     pub model: String,

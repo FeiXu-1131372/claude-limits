@@ -8,7 +8,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct Settings {
     pub polling_interval_secs: u64,
     pub thresholds: Vec<u8>,
@@ -29,7 +29,7 @@ impl Default for Settings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct CachedUsage {
     pub snapshot: UsageSnapshot,
     pub account_id: String,

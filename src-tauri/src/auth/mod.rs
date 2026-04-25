@@ -10,13 +10,13 @@ pub use orchestrator::{AccountInfo, AuthError, AuthOrchestrator, AuthResult};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, specta::Type)]
 pub enum AuthSource {
     OAuth,
     ClaudeCode,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, specta::Type)]
 pub struct AccountId(pub String);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

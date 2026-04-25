@@ -26,7 +26,7 @@ pub enum AuthError {
 
 pub type AuthResult<T> = std::result::Result<T, AuthError>;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
 pub struct AccountInfo {
     pub id: AccountId,
     pub email: String,

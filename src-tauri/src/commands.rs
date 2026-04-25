@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::{command, State};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 pub struct DailyBucket {
     pub date: String,
     pub input_tokens: u64,
@@ -14,7 +14,7 @@ pub struct DailyBucket {
     pub cost_usd: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 pub struct ModelStats {
     pub model: String,
     pub input_tokens: u64,
@@ -24,14 +24,14 @@ pub struct ModelStats {
     pub cost_usd: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 pub struct ProjectStats {
     pub project: String,
     pub session_count: u64,
     pub total_cost_usd: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 pub struct CacheStats {
     pub total_cache_read_tokens: u64,
     pub total_cache_creation_tokens: u64,
@@ -44,11 +44,13 @@ fn err_to_string<E: std::fmt::Display>(e: E) -> String {
 }
 
 #[command]
+#[specta::specta]
 pub async fn get_current_usage(state: State<'_, Arc<AppState>>) -> Result<Option<CachedUsage>, String> {
     Ok(state.snapshot())
 }
 
 #[command]
+#[specta::specta]
 pub async fn get_session_history(
     days: u32,
     state: State<'_, Arc<AppState>>,
@@ -59,6 +61,7 @@ pub async fn get_session_history(
 }
 
 #[command]
+#[specta::specta]
 pub async fn get_daily_trends(
     days: u32,
     state: State<'_, Arc<AppState>>,
@@ -88,6 +91,7 @@ pub async fn get_daily_trends(
 }
 
 #[command]
+#[specta::specta]
 pub async fn get_model_breakdown(
     days: u32,
     state: State<'_, Arc<AppState>>,
@@ -116,6 +120,7 @@ pub async fn get_model_breakdown(
 }
 
 #[command]
+#[specta::specta]
 pub async fn get_project_breakdown(
     days: u32,
     state: State<'_, Arc<AppState>>,
@@ -138,6 +143,7 @@ pub async fn get_project_breakdown(
 }
 
 #[command]
+#[specta::specta]
 pub async fn get_cache_stats(
     days: u32,
     state: State<'_, Arc<AppState>>,
@@ -165,6 +171,7 @@ pub async fn get_cache_stats(
 }
 
 #[command]
+#[specta::specta]
 pub async fn start_oauth_flow(state: State<'_, Arc<AppState>>) -> Result<String, String> {
     use crate::auth::oauth_paste_back::{build_authorize_url, generate_pkce};
     let pkce = generate_pkce();
@@ -174,6 +181,7 @@ pub async fn start_oauth_flow(state: State<'_, Arc<AppState>>) -> Result<String,
 }
 
 #[command]
+#[specta::specta]
 pub async fn submit_oauth_code(
     pasted: String,
     state: State<'_, Arc<AppState>>,
@@ -202,12 +210,14 @@ pub async fn submit_oauth_code(
 }
 
 #[command]
+#[specta::specta]
 pub async fn use_claude_code_creds(state: State<'_, Arc<AppState>>) -> Result<(), String> {
     state.auth.set_preferred_source(AuthSource::ClaudeCode).await;
     Ok(())
 }
 
 #[command]
+#[specta::specta]
 pub async fn pick_auth_source(
     source: AuthSource,
     state: State<'_, Arc<AppState>>,
@@ -217,6 +227,7 @@ pub async fn pick_auth_source(
 }
 
 #[command]
+#[specta::specta]
 pub async fn sign_out(state: State<'_, Arc<AppState>>) -> Result<(), String> {
     use crate::auth::token_store;
     token_store::clear(&state.fallback_dir).map_err(err_to_string)?;
@@ -226,23 +237,27 @@ pub async fn sign_out(state: State<'_, Arc<AppState>>) -> Result<(), String> {
 }
 
 #[command]
+#[specta::specta]
 pub async fn has_claude_code_creds() -> Result<bool, String> {
     Ok(crate::auth::claude_code_creds::has_creds())
 }
 
 #[command]
+#[specta::specta]
 pub async fn update_settings(s: Settings, state: State<'_, Arc<AppState>>) -> Result<(), String> {
     *state.settings.write() = s;
     Ok(())
 }
 
 #[command]
+#[specta::specta]
 pub async fn get_settings(state: State<'_, Arc<AppState>>) -> Result<Settings, String> {
     Ok(state.settings.read().clone())
 }
 
 #[cfg(debug_assertions)]
 #[command]
+#[specta::specta]
 pub async fn debug_force_threshold(
     bucket: String,
     pct: u8,
