@@ -54,6 +54,10 @@ export const UsageBar = forwardRef<HTMLDivElement, UsageBarProps>(
     },
     ref,
   ) => {
+    const rawValue = data?.utilization ?? valueProp ?? 0;
+    const clamped = Math.max(0, Math.min(100, rawValue));
+    const level = useMemo(() => getLevel(clamped, warnAt, dangerAt), [clamped, warnAt, dangerAt]);
+
     if (!data && valueProp === undefined) {
       return (
         <div className={['flex items-center justify-between py-2', className].join(' ')} {...props}>
@@ -62,10 +66,6 @@ export const UsageBar = forwardRef<HTMLDivElement, UsageBarProps>(
         </div>
       );
     }
-
-    const rawValue = data?.utilization ?? valueProp ?? 0;
-    const clamped = Math.max(0, Math.min(100, rawValue));
-    const level = useMemo(() => getLevel(clamped, warnAt, dangerAt), [clamped, warnAt, dangerAt]);
 
     return (
       <div ref={ref} className={['flex flex-col gap-[6px]', className].join(' ')} {...props}>

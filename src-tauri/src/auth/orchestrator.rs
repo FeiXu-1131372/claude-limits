@@ -119,15 +119,26 @@ impl AuthOrchestrator {
         tok: StoredToken,
         source: AuthSource,
     ) -> AuthResult<(String, AuthSource, AccountInfo)> {
-        let info = self
-            .identity
-            .fetch(&tok.access_token)
-            .await
-            .map_err(AuthError::from)?;
-        let acc = AccountInfo {
-            id: (&info).into(),
-            email: info.email,
-            display_name: info.name,
+        // Identity is non-essential for the single-source case: it powers the
+        // conflict chooser and the Account section in Settings. If the userinfo
+        // endpoint is unreachable (404, network error, etc.) we'd rather let
+        // the app keep polling usage than lock the user out entirely.
+        let acc = match self.identity.fetch(&tok.access_token).await {
+            Ok(info) => AccountInfo {
+                id: (&info).into(),
+                email: info.email,
+                display_name: info.name,
+            },
+            Err(e) => {
+                tracing::warn!(
+                    "userinfo fetch failed; continuing with placeholder account: {e}"
+                );
+                AccountInfo {
+                    id: AccountId(format!("unknown-{:?}", source)),
+                    email: String::new(),
+                    display_name: None,
+                }
+            }
         };
         Ok((tok.access_token, source, acc))
     }

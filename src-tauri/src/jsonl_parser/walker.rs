@@ -137,7 +137,24 @@ pub fn ingest_file(db: &Db, pricing: &PricingTable, path: &Path) -> Result<usize
                     source_line: line_start,
                 });
             }
-            Err(e) => tracing::warn!("malformed line in {} at offset {}: {}", key, line_start, e),
+            Err(e) => {
+                // Claude Code JSONLs interleave many non-event record types
+                // (summaries, system pings, tool meta) that legitimately lack
+                // the required ts/project/model fields. Those aren't bugs — log
+                // at debug. Real malformed JSON (where serde can't parse the
+                // outer object) gets a single warn so it's still visible.
+                if e.is_data() {
+                    tracing::debug!(
+                        "skipping non-event line in {} at offset {}: {}",
+                        key, line_start, e
+                    );
+                } else {
+                    tracing::warn!(
+                        "malformed JSON in {} at offset {}: {}",
+                        key, line_start, e
+                    );
+                }
+            }
         }
     }
     let inserted = db.insert_events(&stored)?;
