@@ -3,7 +3,7 @@ pub mod store;
 pub mod usage_api;
 pub mod auth;
 pub mod jsonl_parser;
-mod notifier;
+pub mod notifier;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
