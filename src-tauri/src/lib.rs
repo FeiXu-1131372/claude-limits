@@ -76,7 +76,39 @@ pub fn run() {
             use tauri::Manager;
             let handle = app.handle().clone();
             let state: Arc<AppState> = app.state::<Arc<AppState>>().inner().clone();
-            poll_loop::spawn(handle, state);
+            poll_loop::spawn(handle.clone(), state.clone());
+
+            if let Some(root) = jsonl_parser::walker::claude_projects_root() {
+                let bf_root = root.clone();
+                let bf_state = state.clone();
+                tokio::spawn(async move {
+                    if let Ok(files) = jsonl_parser::walker::discover_jsonl_files(&bf_root) {
+                        for f in files {
+                            let _ = jsonl_parser::walker::ingest_file(
+                                &bf_state.db,
+                                &bf_state.pricing,
+                                &f,
+                            );
+                        }
+                    }
+                });
+
+                let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<usize>();
+                let handle_for_events = handle.clone();
+                tokio::spawn(async move {
+                    use tauri::Emitter;
+                    while let Some(n) = rx.recv().await {
+                        let _ = handle_for_events.emit("session_ingested", n);
+                    }
+                });
+                let _ = jsonl_parser::watcher::start(
+                    state.db.clone(),
+                    state.pricing.clone(),
+                    root,
+                    tx,
+                );
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())
