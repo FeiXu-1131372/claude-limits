@@ -24,10 +24,10 @@ pub struct PricingTable {
 impl PricingTable {
     pub fn load(path: &Path) -> Result<Self> {
         let raw = std::fs::read_to_string(path).context("read pricing.json")?;
-        Self::from_str(&raw)
+        Self::parse(&raw)
     }
 
-    pub fn from_str(raw: &str) -> Result<Self> {
+    pub fn parse(raw: &str) -> Result<Self> {
         let f: PricingFile = serde_json::from_str(raw)?;
         let mut entries = f.pricing;
         entries.sort_by(|a, b| b.prefix.len().cmp(&a.prefix.len()));
@@ -36,7 +36,7 @@ impl PricingTable {
 
     pub fn bundled() -> Result<Self> {
         let raw = include_str!("../../pricing.json");
-        Self::from_str(raw)
+        Self::parse(raw)
     }
 
     pub fn lookup(&self, model: &str) -> Option<&PricingEntry> {

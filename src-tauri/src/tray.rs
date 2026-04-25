@@ -1,5 +1,5 @@
 use tauri::image::Image;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 pub fn set_level(app: &AppHandle, pct: Option<f64>, paused: bool) {
     let tray = app.tray_by_id("main");

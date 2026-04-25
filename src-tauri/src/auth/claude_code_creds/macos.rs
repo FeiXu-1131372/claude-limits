@@ -1,5 +1,3 @@
-#![cfg(target_os = "macos")]
-
 use super::super::StoredToken;
 use anyhow::{anyhow, Context, Result};
 use chrono::{TimeZone, Utc};

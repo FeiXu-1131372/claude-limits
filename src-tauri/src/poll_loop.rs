@@ -1,7 +1,8 @@
 use crate::app_state::{AppState, CachedUsage};
 use crate::auth::AuthError;
 use crate::notifier;
-use crate::usage_api::{next_backoff, FetchOutcome};
+use crate::tray;
+use crate::usage_api::{next_backoff, FetchOutcome, UsageSnapshot};
 use chrono::Utc;
 use serde_json::json;
 use std::sync::Arc;
@@ -23,10 +24,10 @@ pub fn spawn(handle: AppHandle, state: Arc<AppState>) {
             tokio::time::sleep(interval).await;
 
             if let Some(cached) = &*state.cached_usage.read() {
-                if cached.is_stale(Utc::now()) {
-                    if !STALE_EMITTED.swap(true, Ordering::Relaxed) {
-                        let _ = handle.emit("stale_data", ());
-                    }
+                if cached.is_stale(Utc::now())
+                    && !STALE_EMITTED.swap(true, Ordering::Relaxed)
+                {
+                    let _ = handle.emit("stale_data", ());
                 }
             }
 
@@ -87,6 +88,7 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
             };
             *state.cached_usage.write() = Some(cached.clone());
             let _ = handle.emit("usage_updated", &cached);
+            tray::set_level(handle, worst_utilization(&snapshot), false);
 
             let thresholds = state.settings.read().thresholds.clone();
             match notifier::evaluate(
@@ -126,4 +128,17 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
             PollResult::Transient
         }
     }
+}
+
+fn worst_utilization(s: &UsageSnapshot) -> Option<f64> {
+    [
+        s.five_hour.as_ref().map(|u| u.utilization),
+        s.seven_day.as_ref().map(|u| u.utilization),
+        s.seven_day_opus.as_ref().map(|u| u.utilization),
+        s.seven_day_sonnet.as_ref().map(|u| u.utilization),
+        s.extra_usage.as_ref().map(|u| u.utilization),
+    ]
+    .into_iter()
+    .flatten()
+    .fold(None, |acc: Option<f64>, x| Some(acc.map_or(x, |a| a.max(x))))
 }

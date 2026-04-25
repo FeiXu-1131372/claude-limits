@@ -19,5 +19,6 @@
     "paths": { "@/*": ["src/*"] }
   },
   "include": ["src", "vite.config.ts"],
+  "exclude": ["src/lib/generated"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

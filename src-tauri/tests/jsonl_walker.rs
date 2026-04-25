@@ -1,4 +1,3 @@
-use chrono::{Duration, Utc};
 use claude_usage_monitor_lib::jsonl_parser::{walker, PricingTable};
 use claude_usage_monitor_lib::store::{Db, StoredAccount};
 use std::fs;

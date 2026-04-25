@@ -36,6 +36,9 @@ pub fn run() {
         fallback_dir: data_dir.clone(),
     });
 
+    // tauri-specta's Builder::commands replaces previously registered commands rather
+    // than appending, so debug-only handlers must be folded into the same collect_commands! call.
+    #[cfg(not(debug_assertions))]
     let specta_builder = tauri_specta::Builder::<tauri::Wry>::new()
         .commands(tauri_specta::collect_commands![
             commands::get_current_usage,
@@ -56,8 +59,25 @@ pub fn run() {
         ]);
 
     #[cfg(debug_assertions)]
-    let specta_builder =
-        specta_builder.commands(tauri_specta::collect_commands![commands::debug_force_threshold,]);
+    let specta_builder = tauri_specta::Builder::<tauri::Wry>::new()
+        .commands(tauri_specta::collect_commands![
+            commands::get_current_usage,
+            commands::get_session_history,
+            commands::get_daily_trends,
+            commands::get_model_breakdown,
+            commands::get_project_breakdown,
+            commands::get_cache_stats,
+            commands::start_oauth_flow,
+            commands::submit_oauth_code,
+            commands::use_claude_code_creds,
+            commands::pick_auth_source,
+            commands::sign_out,
+            commands::has_claude_code_creds,
+            commands::update_settings,
+            commands::get_settings,
+            commands::open_expanded_window,
+            commands::debug_force_threshold,
+        ]);
 
     #[cfg(debug_assertions)]
     specta_builder

@@ -5,7 +5,7 @@ description = "Cross-platform Claude subscription usage monitor"
 authors = ["Claude Usage Monitor contributors"]
 license = "MIT"
 edition = "2021"
-rust-version = "1.77"
+rust-version = "1.89"
 
 [lib]
 name = "claude_usage_monitor_lib"
@@ -45,7 +45,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 url = "2"
 directories = "5"
-fs4 = "1"
 parking_lot = "0.12"
 specta = "=2.0.0-rc.22"
 specta-typescript = "=0.0.9"

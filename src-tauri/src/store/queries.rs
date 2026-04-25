@@ -246,9 +246,9 @@ mod tests {
             source_file: "f.jsonl".into(),
             source_line: 1,
         };
-        assert_eq!(db.insert_events(&[e.clone()]).unwrap(), 1);
+        assert_eq!(db.insert_events(std::slice::from_ref(&e)).unwrap(), 1);
         assert_eq!(
-            db.insert_events(&[e.clone()]).unwrap(),
+            db.insert_events(std::slice::from_ref(&e)).unwrap(),
             0,
             "dedupe"
         );

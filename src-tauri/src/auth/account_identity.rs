@@ -18,6 +18,12 @@ pub struct IdentityFetcher {
     client: reqwest::Client,
 }
 
+impl Default for IdentityFetcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IdentityFetcher {
     pub fn new() -> Self {
         Self {

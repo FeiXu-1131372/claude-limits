@@ -18,6 +18,12 @@ pub struct TokenExchange {
     client: reqwest::Client,
 }
 
+impl Default for TokenExchange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TokenExchange {
     pub fn new() -> Self {
         Self {
