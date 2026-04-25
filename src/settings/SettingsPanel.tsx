@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { Toggle } from '../components/ui/Toggle';
 import { Slider } from '../components/ui/Slider';
@@ -5,14 +6,37 @@ import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { useAppStore } from '../lib/store';
+import { ipc } from '../lib/ipc';
 import { LogOut } from '../lib/icons';
+import type { Settings } from '../lib/types';
+import { enable as enableAutostart, disable as disableAutostart } from '@tauri-apps/plugin-autostart';
 
 export function SettingsPanel() {
   const settings = useAppStore((s) => s.settings);
+  const setSettings = useAppStore((s) => s.setSettings);
+  const [local, setLocal] = useState<Settings | null>(settings);
 
-  if (!settings) return null;
+  useEffect(() => setLocal(settings), [settings]);
 
-  const pollIntervalMin = Math.round(settings.polling_interval_secs / 60);
+  if (!local) return <p className="text-[var(--color-text-muted)]">Loading...</p>;
+
+  const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+  const pollingMinutes = Math.round(local.polling_interval_secs / 60);
+
+  async function save() {
+    const next: Settings = { ...local!, polling_interval_secs: clamp(local!.polling_interval_secs, 60, 1800) };
+    await setSettings(next);
+    try {
+      if (next.launch_at_login) await enableAutostart();
+      else await disableAutostart();
+    } catch (e) {
+      console.warn('autostart toggle failed', e);
+    }
+  }
+
+  async function signOut() {
+    await ipc.signOut();
+  }
 
   return (
     <div className="flex flex-col gap-[var(--space-lg)] h-full overflow-y-auto">
@@ -25,7 +49,7 @@ export function SettingsPanel() {
           <Toggle
             label="Launch at login"
             description="Start monitoring when you log in"
-            defaultChecked={settings.launch_at_login}
+            defaultChecked={local.launch_at_login}
           />
           <Select
             label="Theme"
@@ -34,7 +58,7 @@ export function SettingsPanel() {
               { value: 'light', label: 'Light' },
               { value: 'dark', label: 'Dark' },
             ]}
-            defaultValue={settings.theme}
+            defaultValue={local.theme}
           />
         </Card>
       </section>
@@ -50,10 +74,10 @@ export function SettingsPanel() {
             min={1}
             max={30}
             step={1}
-            defaultValue={pollIntervalMin}
+            defaultValue={pollingMinutes}
             formatValue={(v) => `${v}m`}
           />
-          {pollIntervalMin <= 2 && (
+          {pollingMinutes <= 2 && (
             <p className="text-[var(--text-micro)] text-[var(--color-warn)] mt-[var(--space-xs)]">
               Frequent polling may cause rate limiting
             </p>
@@ -67,22 +91,17 @@ export function SettingsPanel() {
           Notifications
         </h2>
         <Card className="p-[var(--space-md)] flex flex-col gap-[var(--space-md)]">
-          <Slider
-            label="Warning threshold"
-            min={50}
-            max={89}
-            step={1}
-            defaultValue={settings.thresholds[0] ?? 75}
-            formatValue={(v) => `${v}%`}
-          />
-          <Slider
-            label="Danger threshold"
-            min={51}
-            max={99}
-            step={1}
-            defaultValue={settings.thresholds[1] ?? 90}
-            formatValue={(v) => `${v}%`}
-          />
+          {local.thresholds.map((t, i) => (
+            <Slider
+              key={i}
+              label={`Threshold ${i + 1}`}
+              min={25}
+              max={95}
+              step={5}
+              defaultValue={t}
+              formatValue={(v) => `${v}%`}
+            />
+          ))}
           <div className="flex items-center gap-[var(--space-sm)] px-[var(--space-2xs)]">
             <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">
               Notifications fire once per bucket reset cycle
@@ -102,7 +121,7 @@ export function SettingsPanel() {
               <span className="text-[var(--text-body)] text-[var(--color-text)]">Connected</span>
               <Badge variant="live">OAuth</Badge>
             </div>
-            <Button variant="ghost" size="sm" className="text-[var(--color-danger)]">
+            <Button variant="ghost" size="sm" className="text-[var(--color-danger)]" onClick={signOut}>
               <LogOut size={12} />
               Sign out
             </Button>
@@ -110,7 +129,12 @@ export function SettingsPanel() {
         </Card>
       </section>
 
-      {/* Spacer to prevent content from being cut off */}
+      {/* Save */}
+      <div className="flex justify-end px-[var(--space-2xs)]">
+        <Button variant="primary" onClick={save}>Save</Button>
+      </div>
+
+      {/* Spacer */}
       <div className="h-[var(--space-xl)]" />
     </div>
   );
