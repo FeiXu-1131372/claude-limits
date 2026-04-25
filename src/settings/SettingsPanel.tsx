@@ -4,11 +4,15 @@ import { Slider } from '../components/ui/Slider';
 import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { useStore } from '../lib/store';
+import { useAppStore } from '../lib/store';
 import { LogOut } from '../lib/icons';
 
 export function SettingsPanel() {
-  const settings = useStore((s) => s.settings);
+  const settings = useAppStore((s) => s.settings);
+
+  if (!settings) return null;
+
+  const pollIntervalMin = Math.round(settings.polling_interval_secs / 60);
 
   return (
     <div className="flex flex-col gap-[var(--space-lg)] h-full overflow-y-auto">
@@ -46,10 +50,10 @@ export function SettingsPanel() {
             min={1}
             max={30}
             step={1}
-            defaultValue={settings.poll_interval_min}
+            defaultValue={pollIntervalMin}
             formatValue={(v) => `${v}m`}
           />
-          {settings.poll_interval_min <= 2 && (
+          {pollIntervalMin <= 2 && (
             <p className="text-[var(--text-micro)] text-[var(--color-warn)] mt-[var(--space-xs)]">
               Frequent polling may cause rate limiting
             </p>
@@ -68,7 +72,7 @@ export function SettingsPanel() {
             min={50}
             max={89}
             step={1}
-            defaultValue={settings.warn_threshold}
+            defaultValue={settings.thresholds[0] ?? 75}
             formatValue={(v) => `${v}%`}
           />
           <Slider
@@ -76,7 +80,7 @@ export function SettingsPanel() {
             min={51}
             max={99}
             step={1}
-            defaultValue={settings.danger_threshold}
+            defaultValue={settings.thresholds[1] ?? 90}
             formatValue={(v) => `${v}%`}
           />
           <div className="flex items-center gap-[var(--space-sm)] px-[var(--space-2xs)]">

@@ -1,18 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CompactPopover } from './popover/CompactPopover';
 import { ExpandedReport } from './report/ExpandedReport';
 import { SettingsPanel } from './settings/SettingsPanel';
 import { AuthPanel } from './settings/AuthPanel';
-import { useStore } from './lib/store';
+import { useAppStore } from './lib/store';
 
-type View = 'popover' | 'report' | 'settings' | 'auth';
+type View = 'popover' | 'report' | 'settings';
 
 export function App() {
-  const [view, _setView] = useState<View>('popover');
-  const authState = useStore((s) => s.authState);
+  const init = useAppStore((s) => s.init);
+  const usage = useAppStore((s) => s.usage);
+  const authRequired = useAppStore((s) => s.authRequired);
+  const [view] = useState<View>('popover');
 
-  const currentView = authState === 'unauthenticated' ? 'auth' : view;
+  useEffect(() => {
+    init();
+  }, [init]);
+
+  const currentView: View | 'auth' =
+    !usage || authRequired ? 'auth' : view;
 
   return (
     <AnimatePresence mode="wait">

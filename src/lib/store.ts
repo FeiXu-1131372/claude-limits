@@ -1,74 +1,87 @@
 import { create } from 'zustand';
-
-/* ─── Types matching the Rust IPC surface ─── */
-
-export interface Utilization {
-  used_pct: number;
-  reset_at: string; // ISO 8601
-}
-
-export type Model = 'opus' | 'sonnet' | 'haiku';
-
-export interface UsageSnapshot {
-  five_hour: Utilization;
-  seven_day: Utilization;
-  per_model: Record<Model, Utilization>;
-  fetched_at: string;
-  is_stale: boolean;
-}
-
-export interface Settings {
-  poll_interval_min: number;
-  warn_threshold: number;
-  danger_threshold: number;
-  launch_at_login: boolean;
-  theme: 'system' | 'light' | 'dark';
-}
-
-/* ─── Placeholder data for preview ─── */
-
-const PLACEHOLDER_SNAPSHOT: UsageSnapshot = {
-  five_hour: { used_pct: 68, reset_at: new Date(Date.now() + 6120000).toISOString() },
-  seven_day: { used_pct: 81, reset_at: new Date(Date.now() + 302400000).toISOString() },
-  per_model: {
-    opus: { used_pct: 42, reset_at: '' },
-    sonnet: { used_pct: 31, reset_at: '' },
-    haiku: { used_pct: 8, reset_at: '' },
-  },
-  fetched_at: new Date(Date.now() - 120000).toISOString(),
-  is_stale: false,
-};
-
-const PLACEHOLDER_SETTINGS: Settings = {
-  poll_interval_min: 5,
-  warn_threshold: 75,
-  danger_threshold: 90,
-  launch_at_login: true,
-  theme: 'system',
-};
-
-/* ─── Store ─── */
+import { ipc } from './ipc';
+import { subscribe, type AppEvent } from './events';
+import type { CachedUsage, Settings } from './types';
 
 interface AppStore {
-  snapshot: UsageSnapshot | null;
-  settings: Settings;
-  authState: 'authenticated' | 'unauthenticated' | 'loading';
-  showSettings: boolean;
+  usage: CachedUsage | null;
+  settings: Settings | null;
+  hasClaudeCodeCreds: boolean;
+  authRequired: boolean;
+  conflict: { oauth_email: string; cli_email: string } | null;
+  stale: boolean;
+  dbReset: boolean;
 
-  setSnapshot: (s: UsageSnapshot) => void;
-  setSettings: (s: Settings) => void;
-  setAuthState: (s: AppStore['authState']) => void;
-  setShowSettings: (show: boolean) => void;
+  init: () => Promise<void>;
+  refreshSettings: () => Promise<void>;
+  setSettings: (s: Settings) => Promise<void>;
+  dismissBanner: (kind: 'authRequired' | 'stale' | 'dbReset' | 'conflict') => void;
 }
 
-export const useStore = create<AppStore>((set) => ({
-  snapshot: PLACEHOLDER_SNAPSHOT,
-  settings: PLACEHOLDER_SETTINGS,
-  authState: 'authenticated',
-  showSettings: false,
+export const useAppStore = create<AppStore>((set, _get) => ({
+  usage: null,
+  settings: null,
+  hasClaudeCodeCreds: false,
+  authRequired: false,
+  conflict: null,
+  stale: false,
+  dbReset: false,
 
-  setSnapshot: (snapshot) => set({ snapshot }),
-  setSettings: (settings) => set({ settings }),
-  setAuthState: (authState) => set({ authState }),
-  setShowSettings: (showSettings) => set({ showSettings }),
+  async init() {
+    const [usage, settings, hasClaudeCodeCreds] = await Promise.all([
+      ipc.getCurrentUsage(),
+      ipc.getSettings(),
+      ipc.hasClaudeCodeCreds().catch(() => false),
+    ]);
+    set({ usage, settings, hasClaudeCodeCreds });
+
+    await subscribe((e: AppEvent) => {
+      switch (e.type) {
+        case 'usage_updated':
+          set({ usage: e.payload, authRequired: false, stale: false });
+          break;
+        case 'session_ingested':
+          break;
+        case 'auth_required':
+          set({ authRequired: true });
+          break;
+        case 'auth_source_conflict':
+          set({ conflict: e.payload });
+          break;
+        case 'stale_data':
+          set({ stale: true });
+          break;
+        case 'db_reset':
+          set({ dbReset: true });
+          break;
+      }
+    });
+  },
+
+  async refreshSettings() {
+    const s = await ipc.getSettings();
+    set({ settings: s });
+  },
+
+  async setSettings(s) {
+    await ipc.updateSettings(s);
+    set({ settings: s });
+  },
+
+  dismissBanner(kind) {
+    switch (kind) {
+      case 'authRequired':
+        set({ authRequired: false });
+        break;
+      case 'stale':
+        set({ stale: false });
+        break;
+      case 'dbReset':
+        set({ dbReset: false });
+        break;
+      case 'conflict':
+        set({ conflict: null });
+        break;
+    }
+  },
 }));

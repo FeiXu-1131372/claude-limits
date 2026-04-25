@@ -5,7 +5,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { IconButton } from '../components/ui/IconButton';
 import { UsageBar } from './UsageBar';
-import { useStore } from '../lib/store';
+import { useAppStore } from '../lib/store';
 import { popoverMount, cardStagger, cardChild } from '../lib/motion';
 import { IconRefresh, IconSettings } from '../lib/icons';
 
@@ -30,23 +30,30 @@ function formatResetCountdown(iso: string): string {
 }
 
 const MODELS = [
-  { key: 'opus' as const, label: 'Opus', color: 'var(--color-accent)' },
-  { key: 'sonnet' as const, label: 'Sonnet', color: 'var(--color-warn)' },
-  { key: 'haiku' as const, label: 'Haiku', color: 'var(--color-safe)' },
-];
+  { key: 'seven_day_opus', label: 'Opus', color: 'var(--color-accent)' },
+  { key: 'seven_day_sonnet', label: 'Sonnet', color: 'var(--color-warn)' },
+] as const;
 
 export function CompactPopover() {
-  const snapshot = useStore((s) => s.snapshot);
-  const setShowSettings = useStore((s) => s.setShowSettings);
+  const cached = useAppStore((s) => s.usage);
+  const stale = useAppStore((s) => s.stale);
+
+  const snapshot = cached?.snapshot ?? null;
 
   const fiveTimer = useMemo(
-    () => (snapshot?.five_hour.reset_at ? formatResetCountdown(snapshot.five_hour.reset_at) : ''),
-    [snapshot?.five_hour.reset_at],
+    () =>
+      snapshot?.five_hour?.resets_at
+        ? formatResetCountdown(snapshot.five_hour.resets_at)
+        : '',
+    [snapshot?.five_hour?.resets_at],
   );
 
   const sevenTimer = useMemo(
-    () => (snapshot?.seven_day.reset_at ? formatResetCountdown(snapshot.seven_day.reset_at) : ''),
-    [snapshot?.seven_day.reset_at],
+    () =>
+      snapshot?.seven_day?.resets_at
+        ? formatResetCountdown(snapshot.seven_day.resets_at)
+        : '',
+    [snapshot?.seven_day?.resets_at],
   );
 
   const updatedAgo = useMemo(
@@ -74,15 +81,15 @@ export function CompactPopover() {
           <span className="text-[var(--text-body)] font-[var(--weight-semibold)] text-[var(--color-text)]">
             Claude
           </span>
-          <Badge variant={snapshot.is_stale ? 'stale' : 'live'}>
-            {snapshot.is_stale ? 'Stale' : 'Live'}
+          <Badge variant={stale ? 'stale' : 'live'}>
+            {stale ? 'Stale' : 'Live'}
           </Badge>
         </div>
         <div className="flex items-center gap-[var(--space-2xs)]">
           <IconButton label="Refresh">
             <IconRefresh size={14} />
           </IconButton>
-          <IconButton label="Settings" onClick={() => setShowSettings(true)}>
+          <IconButton label="Settings">
             <IconSettings size={14} />
           </IconButton>
         </div>
@@ -100,24 +107,24 @@ export function CompactPopover() {
             <div className="flex flex-col gap-[var(--space-md)]">
               <UsageBar
                 label="5h window"
-                value={snapshot.five_hour.used_pct}
+                value={snapshot.five_hour?.utilization ?? 0}
                 timer={fiveTimer}
               />
               <UsageBar
                 label="7d window"
-                value={snapshot.seven_day.used_pct}
+                value={snapshot.seven_day?.utilization ?? 0}
                 timer={sevenTimer}
               />
             </div>
           </Card>
         </motion.div>
 
-        {/* Models row — dot + label + number, no double nesting */}
+        {/* Models row */}
         <motion.div variants={cardChild}>
           <Card className="p-[var(--space-sm)]">
             <div className="flex gap-[var(--space-md)] px-[var(--space-2xs)]">
               {MODELS.map(({ key, label, color }) => {
-                const pct = snapshot.per_model[key]?.used_pct ?? 0;
+                const pct = snapshot[key]?.utilization ?? 0;
                 return (
                   <div key={key} className="flex items-center gap-[var(--space-xs)] flex-1">
                     <span

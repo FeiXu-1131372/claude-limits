@@ -8,7 +8,7 @@ import { TrendsTab } from './TrendsTab';
 import { ProjectsTab } from './ProjectsTab';
 import { HeatmapTab } from './HeatmapTab';
 import { CacheTab } from './CacheTab';
-import { useStore } from '../lib/store';
+import { useAppStore } from '../lib/store';
 import { tabSlide } from '../lib/motion';
 import {
   IconSessions,
@@ -40,7 +40,7 @@ const TAB_COMPONENTS: Record<string, React.FC> = {
 
 export function ExpandedReport() {
   const [activeTab, setActiveTab] = useState('sessions');
-  const snapshot = useStore((s) => s.snapshot);
+  const stale = useAppStore((s) => s.stale);
 
   const TabComponent = TAB_COMPONENTS[activeTab] ?? SessionsTab;
 
@@ -58,8 +58,8 @@ export function ExpandedReport() {
           <span className="text-[var(--text-body)] font-[var(--weight-semibold)] text-[var(--color-text)]">
             Claude Usage Report
           </span>
-          <Badge variant={snapshot?.is_stale ? 'stale' : 'live'}>
-            {snapshot?.is_stale ? 'Stale' : 'Live'}
+          <Badge variant={stale ? 'stale' : 'live'}>
+            {stale ? 'Stale' : 'Live'}
           </Badge>
         </div>
         <div className="flex items-center gap-[var(--space-sm)]">
