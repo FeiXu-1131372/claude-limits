@@ -1,32 +1,28 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
 import type { DailyBucket } from '../lib/types';
 import { formatTokens } from '../lib/format';
 import { IconTrends } from '../lib/icons';
-
-/* Placeholder data — 30 days */
-const PLACEHOLDER: DailyBucket[] = Array.from({ length: 30 }, (_, i) => {
-  const d = new Date();
-  d.setDate(d.getDate() - (29 - i));
-  return {
-    date: d.toISOString().slice(0, 10),
-    input_tokens: 60_000 + Math.floor(Math.random() * 540_000),
-    output_tokens: 40_000 + Math.floor(Math.random() * 360_000),
-    cost_usd: 0.5 + Math.random() * 3,
-  };
-});
-
-type Range = '7d' | '30d';
+import { ipc } from '../lib/ipc';
 
 export function TrendsTab() {
-  const [range, setRange] = useState<Range>('30d');
-  const data = PLACEHOLDER;
+  const [data, setData] = useState<DailyBucket[] | null>(null);
+  const [range, setRange] = useState<'7d' | '30d'>('30d');
+
+  useEffect(() => {
+    ipc.getDailyTrends(30).then(setData).catch(() => setData([]));
+  }, []);
 
   const visibleData = useMemo(() => {
+    if (!data) return [];
     const days = range === '7d' ? 7 : 30;
     return data.slice(-days);
   }, [data, range]);
+
+  if (data === null) {
+    return <p className="text-[var(--color-text-muted)]">Loading...</p>;
+  }
 
   if (data.length === 0) {
     return (
@@ -38,13 +34,17 @@ export function TrendsTab() {
     );
   }
 
-  const maxValue = Math.max(...visibleData.map((d) => d.input_tokens + d.output_tokens), 1);
+  const maxValue = Math.max(
+    ...visibleData.map((d) => d.input_tokens + d.output_tokens),
+    1,
+  );
   const chartHeight = 160;
+
   return (
     <div className="flex flex-col gap-[var(--space-md)]">
       {/* Range selector */}
       <div className="flex gap-[var(--space-2xs)] bg-[var(--color-track)] rounded-[var(--radius-sm)] p-[2px] w-fit">
-        {(['7d', '30d'] as Range[]).map((r) => (
+        {(['7d', '30d'] as const).map((r) => (
           <button
             key={r}
             onClick={() => setRange(r)}
@@ -69,8 +69,8 @@ export function TrendsTab() {
           {visibleData.map((day) => {
             const total = day.input_tokens + day.output_tokens;
             const heightPct = (total / maxValue) * 100;
-            const isWarn = day.cost_usd >= 1.5 && day.cost_usd < 3;
             const isDanger = day.cost_usd >= 3;
+            const isWarn = day.cost_usd >= 1.5 && !isDanger;
 
             return (
               <div
@@ -98,7 +98,11 @@ export function TrendsTab() {
                       {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </div>
                     <div className="mono text-[var(--text-label)] text-[var(--color-text)]">
-                      {formatTokens(day.input_tokens + day.output_tokens)}                    </div>
+                      {formatTokens(total)}
+                    </div>
+                    <div className="mono text-[var(--text-micro)] text-[var(--color-text-muted)]">
+                      ${day.cost_usd.toFixed(2)}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -118,14 +122,10 @@ export function TrendsTab() {
         </div>
       </Card>
 
-      {/* Inline summary — no hero metric cards */}
+      {/* Summary */}
       <div className="flex items-center gap-[var(--space-md)] px-[var(--space-2xs)]">
         <span className="mono text-[var(--text-label)] text-[var(--color-text-secondary)]">
           Avg {formatTokens(visibleData.reduce((s, d) => s + d.input_tokens + d.output_tokens, 0) / visibleData.length)}
-        </span>
-        <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">·</span>
-        <span className="mono text-[var(--text-label)] text-[var(--color-text-secondary)]">
-          Peak {formatTokens(Math.max(...visibleData.map((d) => d.input_tokens + d.output_tokens)))}
         </span>
         <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">·</span>
         <span className="mono text-[var(--text-label)] text-[var(--color-text-secondary)]">

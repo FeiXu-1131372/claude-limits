@@ -1,34 +1,36 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { EmptyState } from '../components/ui/EmptyState';
-import type { HeatmapCell } from '../lib/types';
+import type { HeatmapCell, SessionEvent } from '../lib/types';
 import { formatTokens } from '../lib/format';
 import { IconHeatmap } from '../lib/icons';
-
-/* Generate placeholder — ~180 days (6 months) */
-function generatePlaceholder(): HeatmapCell[] {
-  const cells: HeatmapCell[] = [];
-  for (let i = 180; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const val = Math.random();
-    const level = val < 0.25 ? 0 : val < 0.45 ? 1 : val < 0.65 ? 2 : val < 0.85 ? 3 : 4;
-    cells.push({
-      date: d.toISOString().slice(0, 10),
-      value: Math.floor(val * 500_000),
-      level: level as 0 | 1 | 2 | 3 | 4,
-    });
-  }
-  return cells;
-}
-
-const PLACEHOLDER = generatePlaceholder();
+import { ipc } from '../lib/ipc';
 
 const CELL_SIZE = 11;
 const CELL_GAP = 3;
 const CELL_STEP = CELL_SIZE + CELL_GAP;
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const DAY_LABELS = ['Mon', '', 'Wed', '', 'Fri', '', ''];
+
+function sessionsToHeatmap(events: SessionEvent[]): HeatmapCell[] {
+  const byDate = new Map<string, number>();
+  for (const e of events) {
+    const date = new Date(e.ts).toISOString().slice(0, 10);
+    byDate.set(date, (byDate.get(date) ?? 0) + e.input_tokens + e.output_tokens);
+  }
+  const cells: HeatmapCell[] = [];
+  const values = Array.from(byDate.values());
+  const maxVal = Math.max(...values, 1);
+  for (let i = 180; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const value = byDate.get(key) ?? 0;
+    const ratio = value / maxVal;
+    const level = ratio === 0 ? 0 : ratio < 0.25 ? 1 : ratio < 0.5 ? 2 : ratio < 0.75 ? 3 : 4;
+    cells.push({ date: key, value, level: level as 0 | 1 | 2 | 3 | 4 });
+  }
+  return cells;
+}
 
 function getMonthPositions(cells: HeatmapCell[]): { label: string; x: number }[] {
   const seen = new Set<string>();
@@ -57,20 +59,30 @@ const levelColors: Record<number, string> = {
 };
 
 export function HeatmapTab() {
-  const data = PLACEHOLDER;
+  const [events, setEvents] = useState<SessionEvent[] | null>(null);
+
+  useEffect(() => {
+    ipc.getSessionHistory(180).then(setEvents).catch(() => setEvents([]));
+  }, []);
+
+  const data = useMemo(() => (events ? sessionsToHeatmap(events) : []), [events]);
   const [hovered, setHovered] = useState<string | null>(null);
 
   const startDay = useMemo(() => {
     const d = new Date(data[0]?.date ?? '');
-    return (d.getDay() + 6) % 7; // Monday = 0
+    return (d.getDay() + 6) % 7;
   }, [data]);
 
   const totalDays = data.length;
   const weeks = Math.ceil((totalDays + startDay) / 7);
-  const svgWidth = weeks * CELL_STEP + 30; // 30px for day labels
-  const svgHeight = 7 * CELL_STEP + 20; // 20px for month labels
+  const svgWidth = weeks * CELL_STEP + 30;
+  const svgHeight = 7 * CELL_STEP + 20;
 
   const monthPositions = useMemo(() => getMonthPositions(data), [data]);
+
+  if (!events) {
+    return <p className="text-[var(--color-text-muted)]">Loading...</p>;
+  }
 
   if (data.length === 0) {
     return (
@@ -83,6 +95,7 @@ export function HeatmapTab() {
   }
 
   const totalValue = data.reduce((s, c) => s + c.value, 0);
+  const DAY_LABELS = ['Mon', '', 'Wed', '', 'Fri', '', ''];
 
   return (
     <div className="flex flex-col gap-[var(--space-md)]">
@@ -121,7 +134,20 @@ export function HeatmapTab() {
           ))}
 
           {/* Day labels */}
-          {dayLabels}
+          {DAY_LABELS.map((label, i) =>
+            label ? (
+              <text
+                key={i}
+                x={24}
+                y={18 + i * CELL_STEP + CELL_SIZE / 2 + 3}
+                textAnchor="end"
+                className="mono"
+                style={{ fontSize: 9, fill: 'var(--color-text-muted)' }}
+              >
+                {label}
+              </text>
+            ) : null,
+          )}
 
           {/* Cells */}
           {data.map((cell, i) => {
@@ -183,25 +209,5 @@ export function HeatmapTab() {
         </span>
       </div>
     </div>
-  );
-}
-
-/* Day label elements for the SVG */
-const dayLabels = dayLabelRows();
-
-function dayLabelRows() {
-  return DAY_LABELS.map((label, i) =>
-    label ? (
-      <text
-        key={i}
-        x={24}
-        y={18 + i * CELL_STEP + CELL_SIZE / 2 + 3}
-        textAnchor="end"
-        className="mono"
-        style={{ fontSize: 9, fill: 'var(--color-text-muted)' }}
-      >
-        {label}
-      </text>
-    ) : null,
   );
 }

@@ -1,20 +1,21 @@
+import { useEffect, useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
 import type { ProjectStats } from '../lib/types';
 import { formatCost } from '../lib/format';
 import { IconChart } from '../lib/icons';
-
-const PLACEHOLDER: ProjectStats[] = [
-  { project: 'api-server', session_count: 42, total_cost_usd: 12.6 },
-  { project: 'web-app', session_count: 38, total_cost_usd: 5.2 },
-  { project: 'cli-tool', session_count: 18, total_cost_usd: 3.15 },
-  { project: 'data-pipeline', session_count: 12, total_cost_usd: 1.8 },
-  { project: 'scripts', session_count: 5, total_cost_usd: 0.2 },
-];
+import { ipc } from '../lib/ipc';
 
 export function ProjectsTab() {
-  const data = PLACEHOLDER;
-  const maxCost = Math.max(...data.map((p) => p.total_cost_usd), 1);
+  const [data, setData] = useState<ProjectStats[] | null>(null);
+
+  useEffect(() => {
+    ipc.getProjectBreakdown(30).then(setData).catch(() => setData([]));
+  }, []);
+
+  if (data === null) {
+    return <p className="text-[var(--color-text-muted)]">Loading...</p>;
+  }
 
   if (data.length === 0) {
     return (
@@ -25,6 +26,8 @@ export function ProjectsTab() {
       />
     );
   }
+
+  const maxCost = Math.max(...data.map((p) => p.total_cost_usd), 1);
 
   return (
     <div className="flex flex-col gap-[var(--space-sm)]">

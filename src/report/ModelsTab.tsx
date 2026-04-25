@@ -1,23 +1,17 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { EmptyState } from '../components/ui/EmptyState';
-import type { ModelStats } from '../lib/types';
+import type { ModelStats, CacheStats } from '../lib/types';
 import { formatTokens, formatCost } from '../lib/format';
 import { IconChart } from '../lib/icons';
+import { ipc } from '../lib/ipc';
 
 const MODEL_VARIANT: Record<string, 'opus' | 'sonnet' | 'haiku' | 'default'> = {
   opus: 'opus',
   sonnet: 'sonnet',
   haiku: 'haiku',
 };
-
-/* Placeholder */
-const PLACEHOLDER: ModelStats[] = [
-  { model: 'claude-opus-4-20250514', input_tokens: 8_000_000, output_tokens: 4_400_000, cache_read_tokens: 2_000_000, cache_creation_tokens: 1_000_000, cost_usd: 18.6 },
-  { model: 'claude-sonnet-4-20250514', input_tokens: 5_200_000, output_tokens: 3_000_000, cache_read_tokens: 1_500_000, cache_creation_tokens: 800_000, cost_usd: 4.1 },
-  { model: 'claude-haiku-4-5-20251001', input_tokens: 1_000_000, output_tokens: 800_000, cache_read_tokens: 400_000, cache_creation_tokens: 200_000, cost_usd: 0.36 },
-];
 
 function modelKey(name: string): string {
   const lower = name.toLowerCase();
@@ -27,28 +21,47 @@ function modelKey(name: string): string {
   return 'default';
 }
 
+function shortName(model: string): string {
+  const m = model.match(/(opus|sonnet|haiku)-(\d+(?:-\d+)?)/i);
+  return m ? `${m[1]} ${m[2]}` : model;
+}
+
 export function ModelsTab() {
-  const data = PLACEHOLDER;
+  const [models, setModels] = useState<ModelStats[] | null>(null);
+  const [cache, setCache] = useState<CacheStats | null>(null);
+
+  useEffect(() => {
+    Promise.all([ipc.getModelBreakdown(30), ipc.getCacheStats(30)])
+      .then(([m, c]) => {
+        setModels(m);
+        setCache(c);
+      })
+      .catch(() => setModels([]));
+  }, []);
 
   const totalTokens = useMemo(
-    () => data.reduce((s, m) => s + m.input_tokens + m.output_tokens, 0),
-    [data],
+    () => (models ?? []).reduce((s, m) => s + m.input_tokens + m.output_tokens, 0),
+    [models],
   );
   const totalCost = useMemo(
-    () => data.reduce((s, m) => s + m.cost_usd, 0),
-    [data],
+    () => (models ?? []).reduce((s, m) => s + m.cost_usd, 0),
+    [models],
   );
 
   const segments = useMemo(() => {
-    return data.map((m) => ({
+    return (models ?? []).map((m) => ({
       ...m,
       key: modelKey(m.model),
       total: m.input_tokens + m.output_tokens,
       pct: totalTokens > 0 ? ((m.input_tokens + m.output_tokens) / totalTokens) * 100 : 0,
     }));
-  }, [data, totalTokens]);
+  }, [models, totalTokens]);
 
-  if (data.length === 0) {
+  if (models === null || cache === null) {
+    return <p className="text-[var(--color-text-muted)]">Loading...</p>;
+  }
+
+  if (models.length === 0) {
     return (
       <EmptyState
         icon={<IconChart size={32} />}
@@ -113,7 +126,7 @@ export function ModelsTab() {
           <Card key={seg.model} className="p-[var(--space-sm)]">
             <div className="flex items-center gap-[var(--space-sm)]">
               <Badge variant={MODEL_VARIANT[seg.key] ?? 'default'}>
-                {seg.key}
+                {shortName(seg.model)}
               </Badge>
               <div className="flex-1">
                 <div className="w-full h-[6px] rounded-[var(--radius-pill)] bg-[var(--color-track)] overflow-hidden">
@@ -143,6 +156,27 @@ export function ModelsTab() {
           </Card>
         ))}
       </div>
+
+      {/* Cache efficiency */}
+      <Card className="p-[var(--space-md)]">
+        <h3 className="text-[var(--text-label)] font-[var(--weight-medium)] text-[var(--color-text-muted)] mb-[var(--space-sm)]">
+          Cache efficiency (30d)
+        </h3>
+        <div className="grid grid-cols-2 gap-[var(--space-sm)]">
+          <div>
+            <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">Hit ratio</span>
+            <p className="mono text-[var(--text-body)] font-[var(--weight-semibold)] text-[var(--color-text)]">
+              {(cache.hit_ratio * 100).toFixed(1)}%
+            </p>
+          </div>
+          <div>
+            <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">Est. savings</span>
+            <p className="mono text-[var(--text-body)] font-[var(--weight-semibold)] text-[var(--color-safe)]">
+              ${cache.estimated_savings_usd.toFixed(2)}
+            </p>
+          </div>
+        </div>
+      </Card>
 
       {/* Total */}
       <div className="flex items-center justify-between px-[var(--space-2xs)]">

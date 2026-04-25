@@ -1,18 +1,21 @@
+import { useEffect, useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
 import type { CacheStats } from '../lib/types';
 import { formatTokens } from '../lib/format';
 import { IconCache } from '../lib/icons';
-
-const PLACEHOLDER: CacheStats = {
-  total_cache_read_tokens: 14_200_000,
-  total_cache_creation_tokens: 3_800_000,
-  estimated_savings_usd: 42.6,
-  hit_ratio: 0.63,
-};
+import { ipc } from '../lib/ipc';
 
 export function CacheTab() {
-  const data = PLACEHOLDER;
+  const [data, setData] = useState<CacheStats | null>(null);
+
+  useEffect(() => {
+    ipc.getCacheStats(30).then(setData).catch(() => setData(null));
+  }, []);
+
+  if (!data) {
+    return <p className="text-[var(--color-text-muted)]">Loading...</p>;
+  }
 
   const totalCacheTokens = data.total_cache_read_tokens + data.total_cache_creation_tokens;
   if (totalCacheTokens === 0) {

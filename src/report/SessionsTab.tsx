@@ -1,15 +1,24 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '../components/ui/Badge';
 import { EmptyState } from '../components/ui/EmptyState';
 import type { SessionEvent } from '../lib/types';
 import { formatTokens, formatCost } from '../lib/format';
 import { IconSessions } from '../lib/icons';
+import { ipc } from '../lib/ipc';
 
-const MODEL_BADGE: Record<string, 'opus' | 'sonnet' | 'haiku'> = {
+const MODEL_BADGE: Record<string, 'opus' | 'sonnet' | 'haiku' | 'default'> = {
   opus: 'opus',
   sonnet: 'sonnet',
   haiku: 'haiku',
 };
+
+function modelKey(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower.includes('opus')) return 'opus';
+  if (lower.includes('sonnet')) return 'sonnet';
+  if (lower.includes('haiku')) return 'haiku';
+  return 'default';
+}
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -20,30 +29,23 @@ function formatTime(iso: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + time;
 }
 
-/* Placeholder data */
-const PLACEHOLDER_SESSIONS: SessionEvent[] = Array.from({ length: 25 }, (_, i) => ({
-  ts: new Date(Date.now() - i * 2400000).toISOString(),
-  project: ['api-server', 'web-app', 'cli-tool', 'data-pipeline'][i % 4],
-  model: (['opus', 'sonnet', 'haiku'] as const)[i % 3],
-  input_tokens: 2000 + Math.floor(Math.random() * 8000),
-  output_tokens: 1000 + Math.floor(Math.random() * 4000),
-  cache_read_tokens: Math.floor(Math.random() * 3000),
-  cache_creation_5m_tokens: Math.floor(Math.random() * 1000),
-  cache_creation_1h_tokens: Math.floor(Math.random() * 500),
-  cost_usd: 0.02 + Math.random() * 0.15,
-  source_file: `~/.claude/projects/${['api-server', 'web-app', 'cli-tool', 'data-pipeline'][i % 4]}/session.jsonl`,
-  source_line: i * 256,
-}));
-
 export function SessionsTab() {
-  const sessions = PLACEHOLDER_SESSIONS;
+  const [events, setEvents] = useState<SessionEvent[] | null>(null);
+
+  useEffect(() => {
+    ipc.getSessionHistory(7).then(setEvents).catch(() => setEvents([]));
+  }, []);
 
   const totalCost = useMemo(
-    () => sessions.reduce((sum, s) => sum + s.cost_usd, 0),
-    [sessions],
+    () => (events ?? []).reduce((sum, s) => sum + s.cost_usd, 0),
+    [events],
   );
 
-  if (sessions.length === 0) {
+  if (events === null) {
+    return <p className="text-[var(--color-text-muted)]">Loading...</p>;
+  }
+
+  if (events.length === 0) {
     return (
       <EmptyState
         icon={<IconSessions size={32} />}
@@ -57,7 +59,7 @@ export function SessionsTab() {
     <div className="flex flex-col gap-[var(--space-sm)]">
       <div className="flex items-center justify-between px-[var(--space-2xs)]">
         <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">
-          {sessions.length} sessions
+          {events.length} sessions
         </span>
         <span className="mono text-[var(--text-label)] text-[var(--color-text-secondary)]">
           {formatCost(totalCost)}
@@ -65,11 +67,12 @@ export function SessionsTab() {
       </div>
 
       <div className="flex flex-col">
-        {sessions.map((session, i) => {
+        {events.map((session, i) => {
           const total = session.input_tokens + session.output_tokens;
+          const key = modelKey(session.model);
           return (
             <div
-              key={i}
+              key={`${session.source_file}-${session.source_line}-${i}`}
               className={[
                 'flex items-center gap-[var(--space-md)]',
                 'px-[var(--space-sm)] py-[var(--space-sm)]',
@@ -83,8 +86,8 @@ export function SessionsTab() {
                   <span className="text-[var(--text-body)] text-[var(--color-text)] truncate">
                     {session.project}
                   </span>
-                  <Badge variant={MODEL_BADGE[session.model] ?? 'default'}>
-                    {session.model}
+                  <Badge variant={MODEL_BADGE[key] ?? 'default'}>
+                    {key}
                   </Badge>
                 </div>
                 <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">
