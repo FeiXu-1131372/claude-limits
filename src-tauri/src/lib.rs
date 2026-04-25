@@ -1,7 +1,7 @@
 mod logging;
 mod store;
 pub mod usage_api;
-mod auth;
+pub mod auth;
 mod jsonl_parser;
 mod notifier;
 

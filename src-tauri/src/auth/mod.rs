@@ -2,6 +2,7 @@ pub mod oauth_paste_back;
 pub mod token_store;
 pub mod claude_code_creds;
 pub mod account_identity;
+pub mod exchange;
 
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
