@@ -12,7 +12,7 @@ use tauri::{AppHandle, Emitter};
 static STALE_EMITTED: AtomicBool = AtomicBool::new(false);
 
 pub fn spawn(handle: AppHandle, state: Arc<AppState>) {
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         let _ = poll_once(&handle, &state).await;
         let mut backoff = Duration::from_secs(60);
         loop {

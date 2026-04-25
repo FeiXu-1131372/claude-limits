@@ -30,7 +30,7 @@ pub fn start(
 
     let db_clone = db.clone();
     let pricing_clone = pricing.clone();
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         while let Some(events) = notify_rx.recv().await {
             let mut touched = std::collections::HashSet::<PathBuf>::new();
             for e in &events {

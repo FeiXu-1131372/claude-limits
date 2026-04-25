@@ -150,7 +150,7 @@ pub fn run() {
             if let Some(root) = jsonl_parser::walker::claude_projects_root() {
                 let bf_root = root.clone();
                 let bf_state = state.clone();
-                tokio::spawn(async move {
+                tauri::async_runtime::spawn(async move {
                     if let Ok(files) = jsonl_parser::walker::discover_jsonl_files(&bf_root) {
                         for f in files {
                             let _ = jsonl_parser::walker::ingest_file(
@@ -164,7 +164,7 @@ pub fn run() {
 
                 let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<usize>();
                 let handle_for_events = handle.clone();
-                tokio::spawn(async move {
+                tauri::async_runtime::spawn(async move {
                     use tauri::Emitter;
                     while let Some(n) = rx.recv().await {
                         let _ = handle_for_events.emit("session_ingested", n);
