@@ -28,8 +28,11 @@ const PLACEHOLDER_SESSIONS: SessionEvent[] = Array.from({ length: 25 }, (_, i) =
   input_tokens: 2000 + Math.floor(Math.random() * 8000),
   output_tokens: 1000 + Math.floor(Math.random() * 4000),
   cache_read_tokens: Math.floor(Math.random() * 3000),
-  cache_write_tokens: Math.floor(Math.random() * 1000),
+  cache_creation_5m_tokens: Math.floor(Math.random() * 1000),
+  cache_creation_1h_tokens: Math.floor(Math.random() * 500),
   cost_usd: 0.02 + Math.random() * 0.15,
+  source_file: `~/.claude/projects/${['api-server', 'web-app', 'cli-tool', 'data-pipeline'][i % 4]}/session.jsonl`,
+  source_line: i * 256,
 }));
 
 export function SessionsTab() {

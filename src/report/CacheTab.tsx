@@ -5,17 +5,17 @@ import { formatTokens } from '../lib/format';
 import { IconCache } from '../lib/icons';
 
 const PLACEHOLDER: CacheStats = {
-  cache_read_tokens: 14_200_000,
-  cache_write_tokens: 3_800_000,
-  total_input_tokens: 22_400_000,
+  total_cache_read_tokens: 14_200_000,
+  total_cache_creation_tokens: 3_800_000,
   estimated_savings_usd: 42.6,
-  hit_rate_pct: 63,
+  hit_ratio: 0.63,
 };
 
 export function CacheTab() {
   const data = PLACEHOLDER;
 
-  if (data.total_input_tokens === 0) {
+  const totalCacheTokens = data.total_cache_read_tokens + data.total_cache_creation_tokens;
+  if (totalCacheTokens === 0) {
     return (
       <EmptyState
         icon={<IconCache size={32} />}
@@ -25,9 +25,9 @@ export function CacheTab() {
     );
   }
 
-  const hitRate = data.hit_rate_pct;
+  const hitRatePct = data.hit_ratio * 100;
   const circumference = 2 * Math.PI * 50;
-  const strokeLength = (hitRate / 100) * circumference;
+  const strokeLength = (hitRatePct / 100) * circumference;
 
   return (
     <div className="flex flex-col gap-[var(--space-lg)]">
@@ -58,7 +58,7 @@ export function CacheTab() {
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="mono text-[28px] font-[var(--weight-semibold)] text-[var(--color-accent)] leading-[var(--leading-display)]">
-              {Math.round(hitRate)}%
+              {Math.round(hitRatePct)}%
             </span>
             <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">cache hit rate</span>
           </div>
@@ -70,19 +70,19 @@ export function CacheTab() {
         <Card className="p-[var(--space-md)] flex flex-col gap-[4px]">
           <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">Cache reads</span>
           <span className="mono text-[var(--text-body)] font-[var(--weight-semibold)] text-[var(--color-text)]">
-            {formatTokens(data.cache_read_tokens)}
+            {formatTokens(data.total_cache_read_tokens)}
           </span>
         </Card>
         <Card className="p-[var(--space-md)] flex flex-col gap-[4px]">
           <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">Cache writes</span>
           <span className="mono text-[var(--text-body)] font-[var(--weight-semibold)] text-[var(--color-text)]">
-            {formatTokens(data.cache_write_tokens)}
+            {formatTokens(data.total_cache_creation_tokens)}
           </span>
         </Card>
         <Card className="p-[var(--space-md)] flex flex-col gap-[4px]">
-          <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">Total input</span>
+          <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">Total cached</span>
           <span className="mono text-[var(--text-body)] font-[var(--weight-semibold)] text-[var(--color-text)]">
-            {formatTokens(data.total_input_tokens)}
+            {formatTokens(totalCacheTokens)}
           </span>
         </Card>
         <Card className="p-[var(--space-md)] flex flex-col gap-[4px]">
@@ -96,33 +96,25 @@ export function CacheTab() {
       {/* Breakdown bar */}
       <Card className="p-[var(--space-md)]">
         <div className="flex flex-col gap-[var(--space-sm)]">
-          <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">Input token breakdown</span>
+          <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">Cache token breakdown</span>
           <div className="flex h-[10px] rounded-[var(--radius-pill)] overflow-hidden gap-[1px]">
             <div
               className="h-full bg-[var(--color-accent)] rounded-l-[var(--radius-pill)]"
-              style={{ width: `${hitRate}%` }}
+              style={{ width: `${hitRatePct}%` }}
             />
             <div
-              className="h-full bg-[var(--color-warn)]"
-              style={{ width: `${(data.cache_write_tokens / data.total_input_tokens) * 100}%` }}
-            />
-            <div
-              className="h-full bg-[var(--color-track)] rounded-r-[var(--radius-pill)]"
-              style={{ width: `${100 - hitRate - (data.cache_write_tokens / data.total_input_tokens) * 100}%` }}
+              className="h-full bg-[var(--color-warn)] rounded-r-[var(--radius-pill)]"
+              style={{ width: `${100 - hitRatePct}%` }}
             />
           </div>
           <div className="flex gap-[var(--space-md)]">
             <div className="flex items-center gap-[var(--space-2xs)]">
               <div className="w-[8px] h-[8px] rounded-full bg-[var(--color-accent)]" />
-              <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">Cached</span>
+              <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">Cache reads</span>
             </div>
             <div className="flex items-center gap-[var(--space-2xs)]">
               <div className="w-[8px] h-[8px] rounded-full bg-[var(--color-warn)]" />
-              <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">Write</span>
-            </div>
-            <div className="flex items-center gap-[var(--space-2xs)]">
-              <div className="w-[8px] h-[8px] rounded-full bg-[var(--color-track)]" />
-              <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">New</span>
+              <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">Cache writes</span>
             </div>
           </div>
         </div>

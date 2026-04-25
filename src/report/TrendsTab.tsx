@@ -11,9 +11,8 @@ const PLACEHOLDER: DailyBucket[] = Array.from({ length: 30 }, (_, i) => {
   d.setDate(d.getDate() - (29 - i));
   return {
     date: d.toISOString().slice(0, 10),
-    five_hour_pct: 20 + Math.floor(Math.random() * 70),
-    seven_day_pct: 30 + Math.floor(Math.random() * 50),
-    tokens: 100_000 + Math.floor(Math.random() * 900_000),
+    input_tokens: 60_000 + Math.floor(Math.random() * 540_000),
+    output_tokens: 40_000 + Math.floor(Math.random() * 360_000),
     cost_usd: 0.5 + Math.random() * 3,
   };
 });
@@ -39,7 +38,7 @@ export function TrendsTab() {
     );
   }
 
-  const maxValue = Math.max(...visibleData.map((d) => d.tokens), 1);
+  const maxValue = Math.max(...visibleData.map((d) => d.input_tokens + d.output_tokens), 1);
   const chartHeight = 160;
   return (
     <div className="flex flex-col gap-[var(--space-md)]">
@@ -68,10 +67,10 @@ export function TrendsTab() {
       <Card className="p-[var(--space-md)]">
         <div className="flex items-end gap-[2px]" style={{ height: chartHeight }}>
           {visibleData.map((day) => {
-            const heightPct = (day.tokens / maxValue) * 100;
-            const fivePct = day.five_hour_pct;
-            const isWarn = fivePct >= 75 && fivePct < 90;
-            const isDanger = fivePct >= 90;
+            const total = day.input_tokens + day.output_tokens;
+            const heightPct = (total / maxValue) * 100;
+            const isWarn = day.cost_usd >= 1.5 && day.cost_usd < 3;
+            const isDanger = day.cost_usd >= 3;
 
             return (
               <div
@@ -99,8 +98,7 @@ export function TrendsTab() {
                       {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </div>
                     <div className="mono text-[var(--text-label)] text-[var(--color-text)]">
-                      {formatTokens(day.tokens)}
-                    </div>
+                      {formatTokens(day.input_tokens + day.output_tokens)}                    </div>
                   </div>
                 </div>
               </div>
@@ -123,11 +121,11 @@ export function TrendsTab() {
       {/* Inline summary — no hero metric cards */}
       <div className="flex items-center gap-[var(--space-md)] px-[var(--space-2xs)]">
         <span className="mono text-[var(--text-label)] text-[var(--color-text-secondary)]">
-          Avg {formatTokens(visibleData.reduce((s, d) => s + d.tokens, 0) / visibleData.length)}
+          Avg {formatTokens(visibleData.reduce((s, d) => s + d.input_tokens + d.output_tokens, 0) / visibleData.length)}
         </span>
         <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">·</span>
         <span className="mono text-[var(--text-label)] text-[var(--color-text-secondary)]">
-          Peak {formatTokens(Math.max(...visibleData.map((d) => d.tokens)))}
+          Peak {formatTokens(Math.max(...visibleData.map((d) => d.input_tokens + d.output_tokens)))}
         </span>
         <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">·</span>
         <span className="mono text-[var(--text-label)] text-[var(--color-text-secondary)]">
