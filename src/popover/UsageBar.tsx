@@ -1,14 +1,20 @@
 import { forwardRef, type HTMLAttributes, useMemo } from 'react';
+import { ResetCountdown } from './ResetCountdown';
+import type { Utilization } from '../lib/types';
 
 type ThresholdLevel = 'safe' | 'warn' | 'danger';
 
 interface UsageBarProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
-  value: number;
+  label?: string;
+  /** Pass a Utilization object from the API, OR use value/timer directly */
+  data?: Utilization | null;
+  /** Raw value override (used when data is null but we want to show a number) */
+  value?: number;
   warnAt?: number;
   dangerAt?: number;
   size?: 'sm' | 'md';
   showLabel?: boolean;
-  label?: string;
+  /** Raw timer string override */
   timer?: string;
 }
 
@@ -35,19 +41,30 @@ const textColorMap: Record<ThresholdLevel, string> = {
 export const UsageBar = forwardRef<HTMLDivElement, UsageBarProps>(
   (
     {
-      value,
+      label,
+      data,
+      value: valueProp,
       warnAt = 75,
       dangerAt = 90,
       size = 'md',
       showLabel = true,
-      label,
-      timer,
+      timer: timerProp,
       className = '',
       ...props
     },
     ref,
   ) => {
-    const clamped = Math.max(0, Math.min(100, value));
+    if (!data && valueProp === undefined) {
+      return (
+        <div className={['flex items-center justify-between py-2', className].join(' ')} {...props}>
+          <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">{label}</span>
+          <span className="mono text-[var(--text-label)] text-[var(--color-text-muted)] opacity-60">n/a</span>
+        </div>
+      );
+    }
+
+    const rawValue = data?.utilization ?? valueProp ?? 0;
+    const clamped = Math.max(0, Math.min(100, rawValue));
     const level = useMemo(() => getLevel(clamped, warnAt, dangerAt), [clamped, warnAt, dangerAt]);
 
     return (
@@ -57,9 +74,12 @@ export const UsageBar = forwardRef<HTMLDivElement, UsageBarProps>(
             <span className="text-[var(--text-label)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]">
               {label}
             </span>
-            {timer && (
+            {data?.resets_at && (
+              <ResetCountdown resetsAt={data.resets_at} />
+            )}
+            {timerProp && !data?.resets_at && (
               <span className="mono text-[var(--text-micro)] text-[var(--color-text-muted)]">
-                {timer}
+                {timerProp}
               </span>
             )}
           </div>
