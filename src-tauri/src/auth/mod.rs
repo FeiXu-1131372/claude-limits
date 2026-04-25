@@ -1,14 +1,20 @@
-pub mod oauth_paste_back;
-pub mod token_store;
-pub mod claude_code_creds;
 pub mod account_identity;
+pub mod claude_code_creds;
 pub mod exchange;
+pub mod oauth_paste_back;
+pub mod orchestrator;
+pub mod token_store;
 
-use serde::{Deserialize, Serialize};
+pub use orchestrator::{AccountInfo, AuthError, AuthOrchestrator, AuthResult};
+
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum AuthSource { OAuth, ClaudeCode }
+pub enum AuthSource {
+    OAuth,
+    ClaudeCode,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct AccountId(pub String);
