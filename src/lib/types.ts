@@ -7,9 +7,9 @@ export interface Utilization {
 
 export interface ExtraUsage {
   is_enabled: boolean;
-  monthly_limit_cents: number;
-  used_credits_cents: number;
-  utilization: number;
+  monthly_limit_cents?: number;
+  used_credits_cents?: number;
+  utilization?: number;
   resets_at: string | null;
 }
 
@@ -20,7 +20,6 @@ export interface UsageSnapshot {
   seven_day_opus: Utilization | null;
   extra_usage: ExtraUsage | null;
   fetched_at: string;
-  unknown: Record<string, unknown>;
 }
 
 export interface CachedUsage {

@@ -30,11 +30,13 @@ pub struct UsageSnapshot {
     pub seven_day_opus: Option<Utilization>,
     pub extra_usage: Option<ExtraUsage>,
 
-    #[serde(default = "Utc::now", skip_serializing)]
+    #[serde(default = "Utc::now")]
     #[specta(type = String)]
     pub fetched_at: DateTime<Utc>,
 
-    #[serde(flatten, default)]
+    // Carries forward unknown fields from the wire so we never reject a payload
+    // that the API extends; not exposed to the frontend.
+    #[serde(flatten, default, skip_serializing)]
     #[specta(skip)]
     pub unknown: HashMap<String, serde_json::Value>,
 }

@@ -11,32 +11,65 @@ import { LogOut } from '../lib/icons';
 import type { Settings } from '../lib/types';
 import { enable as enableAutostart, disable as disableAutostart } from '@tauri-apps/plugin-autostart';
 
+const POLL_MIN_SECS = 60;
+const POLL_MAX_SECS = 1800;
+
 export function SettingsPanel() {
   const settings = useAppStore((s) => s.settings);
   const setSettings = useAppStore((s) => s.setSettings);
+  const usage = useAppStore((s) => s.usage);
+  const hasClaudeCodeCreds = useAppStore((s) => s.hasClaudeCodeCreds);
   const [local, setLocal] = useState<Settings | null>(settings);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => setLocal(settings), [settings]);
 
   if (!local) return <p className="text-[var(--color-text-muted)]">Loading...</p>;
 
   const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
-  const pollingMinutes = Math.round(local.polling_interval_secs / 60);
+  const pollingMinutes = Math.max(1, Math.round(local.polling_interval_secs / 60));
+
+  function update<K extends keyof Settings>(key: K, value: Settings[K]) {
+    setLocal((prev) => (prev ? { ...prev, [key]: value } : prev));
+  }
 
   async function save() {
-    const next: Settings = { ...local!, polling_interval_secs: clamp(local!.polling_interval_secs, 60, 1800) };
-    await setSettings(next);
+    if (!local) return;
+    setSaving(true);
+    setSaveError(null);
     try {
-      if (next.launch_at_login) await enableAutostart();
-      else await disableAutostart();
+      const next: Settings = {
+        ...local,
+        polling_interval_secs: clamp(local.polling_interval_secs, POLL_MIN_SECS, POLL_MAX_SECS),
+      };
+      await setSettings(next);
+      try {
+        if (next.launch_at_login) await enableAutostart();
+        else await disableAutostart();
+      } catch (e) {
+        // Autostart toggle is best-effort: surface but don't fail the whole save.
+        const msg = e instanceof Error ? e.message : String(e);
+        setSaveError(`Saved, but autostart toggle failed: ${msg}`);
+      }
     } catch (e) {
-      console.warn('autostart toggle failed', e);
+      const msg = e instanceof Error ? e.message : String(e);
+      setSaveError(`Save failed: ${msg}`);
+    } finally {
+      setSaving(false);
     }
   }
 
   async function signOut() {
     await ipc.signOut();
   }
+
+  // Show actual auth state instead of hardcoding "OAuth".
+  const accountStatus = usage
+    ? { connected: true, email: usage.account_email, source: 'OAuth' as const }
+    : hasClaudeCodeCreds
+      ? { connected: true, email: null, source: 'Claude Code' as const }
+      : { connected: false, email: null, source: null };
 
   return (
     <div className="flex flex-col gap-[var(--space-lg)] h-full overflow-y-auto">
@@ -49,7 +82,8 @@ export function SettingsPanel() {
           <Toggle
             label="Launch at login"
             description="Start monitoring when you log in"
-            defaultChecked={local.launch_at_login}
+            checked={local.launch_at_login}
+            onChange={(e) => update('launch_at_login', e.target.checked)}
           />
           <Select
             label="Theme"
@@ -58,7 +92,8 @@ export function SettingsPanel() {
               { value: 'light', label: 'Light' },
               { value: 'dark', label: 'Dark' },
             ]}
-            defaultValue={local.theme}
+            value={local.theme}
+            onChange={(e) => update('theme', e.target.value)}
           />
         </Card>
       </section>
@@ -74,7 +109,8 @@ export function SettingsPanel() {
             min={1}
             max={30}
             step={1}
-            defaultValue={pollingMinutes}
+            value={pollingMinutes}
+            onChange={(e) => update('polling_interval_secs', Number(e.target.value) * 60)}
             formatValue={(v) => `${v}m`}
           />
           {pollingMinutes <= 2 && (
@@ -98,7 +134,13 @@ export function SettingsPanel() {
               min={25}
               max={95}
               step={5}
-              defaultValue={t}
+              value={t}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                const next = [...local.thresholds];
+                next[i] = v;
+                update('thresholds', next);
+              }}
               formatValue={(v) => `${v}%`}
             />
           ))}
@@ -118,20 +160,31 @@ export function SettingsPanel() {
         <Card className="p-[var(--space-md)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-[var(--space-sm)]">
-              <span className="text-[var(--text-body)] text-[var(--color-text)]">Connected</span>
-              <Badge variant="live">OAuth</Badge>
+              <span className="text-[var(--text-body)] text-[var(--color-text)]">
+                {accountStatus.connected ? (accountStatus.email ?? 'Connected') : 'Not signed in'}
+              </span>
+              {accountStatus.source && <Badge variant="live">{accountStatus.source}</Badge>}
             </div>
-            <Button variant="ghost" size="sm" className="text-[var(--color-danger)]" onClick={signOut}>
-              <LogOut size={12} />
-              Sign out
-            </Button>
+            {accountStatus.connected && (
+              <Button variant="ghost" size="sm" className="text-[var(--color-danger)]" onClick={signOut}>
+                <LogOut size={12} />
+                Sign out
+              </Button>
+            )}
           </div>
         </Card>
       </section>
 
       {/* Save */}
-      <div className="flex justify-end px-[var(--space-2xs)]">
-        <Button variant="primary" onClick={save}>Save</Button>
+      <div className="flex flex-col gap-[var(--space-xs)] px-[var(--space-2xs)]">
+        {saveError && (
+          <span className="text-[var(--text-micro)] text-[var(--color-danger)]">{saveError}</span>
+        )}
+        <div className="flex justify-end">
+          <Button variant="primary" onClick={save} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
       </div>
 
       {/* Spacer */}

@@ -228,11 +228,23 @@ pub async fn pick_auth_source(
 
 #[command]
 #[specta::specta]
-pub async fn sign_out(state: State<'_, Arc<AppState>>) -> Result<(), String> {
+pub async fn sign_out(
+    app: tauri::AppHandle,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
     use crate::auth::token_store;
+    use crate::tray;
     token_store::clear(&state.fallback_dir).map_err(err_to_string)?;
     *state.cached_usage.write() = None;
     *state.pending_oauth.write() = None;
+    tray::set_level(&app, None, true);
+    Ok(())
+}
+
+#[command]
+#[specta::specta]
+pub async fn force_refresh(state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    state.force_refresh.notify_one();
     Ok(())
 }
 

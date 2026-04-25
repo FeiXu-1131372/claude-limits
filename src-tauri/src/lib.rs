@@ -34,6 +34,7 @@ pub fn run() {
         cached_usage: parking_lot::RwLock::new(None),
         pending_oauth: parking_lot::RwLock::new(None),
         fallback_dir: data_dir.clone(),
+        force_refresh: tokio::sync::Notify::new(),
     });
 
     // tauri-specta's Builder::commands replaces previously registered commands rather
@@ -56,6 +57,7 @@ pub fn run() {
             commands::update_settings,
             commands::get_settings,
             commands::open_expanded_window,
+            commands::force_refresh,
         ]);
 
     #[cfg(debug_assertions)]
@@ -76,6 +78,7 @@ pub fn run() {
             commands::update_settings,
             commands::get_settings,
             commands::open_expanded_window,
+            commands::force_refresh,
             commands::debug_force_threshold,
         ]);
 

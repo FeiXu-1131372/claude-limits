@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -7,13 +7,16 @@ import { Banner } from '../components/ui/Banner';
 import { IconButton } from '../components/ui/IconButton';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { UsageBar } from './UsageBar';
+import { SettingsPanel } from '../settings/SettingsPanel';
 import { useAppStore } from '../lib/store';
 import { ipc } from '../lib/ipc';
 import { popoverMount, cardStagger, cardChild } from '../lib/motion';
 import { IconRefresh, IconSettings } from '../lib/icons';
 
 function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return '';
+  const diff = Date.now() - t;
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'just now';
   if (mins < 60) return `${mins}m ago`;
@@ -28,6 +31,35 @@ export function CompactPopover() {
   const stale = useAppStore((s) => s.stale);
   const conflict = useAppStore((s) => s.conflict);
   const dismissBanner = useAppStore((s) => s.dismissBanner);
+  const [view, setView] = useState<'home' | 'settings'>('home');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchedAt = usage?.snapshot.fetched_at;
+  const updatedAgo = useMemo(
+    () => (fetchedAt ? formatRelativeTime(fetchedAt) : ''),
+    [fetchedAt],
+  );
+
+  if (view === 'settings') {
+    return (
+      <div
+        className="flex flex-col p-[var(--space-md)]"
+        style={{ width: 'var(--popover-width)', height: 'var(--popover-height)' }}
+      >
+        <div className="flex items-center justify-between mb-[var(--space-sm)]">
+          <span className="text-[var(--text-body)] font-[var(--weight-semibold)] text-[var(--color-text)]">
+            Settings
+          </span>
+          <Button variant="ghost" size="sm" onClick={() => setView('home')}>
+            Done
+          </Button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          <SettingsPanel />
+        </div>
+      </div>
+    );
+  }
 
   if (!usage) {
     return (
@@ -40,10 +72,16 @@ export function CompactPopover() {
   const snap = usage.snapshot;
   const extra = snap.extra_usage;
 
-  const updatedAgo = useMemo(
-    () => (snap.fetched_at ? formatRelativeTime(snap.fetched_at) : ''),
-    [snap.fetched_at],
-  );
+  async function handleRefresh() {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await ipc.forceRefresh();
+    } finally {
+      // Brief minimum spin so the click feels intentional even on fast refreshes.
+      setTimeout(() => setRefreshing(false), 400);
+    }
+  }
 
   return (
     <motion.div
@@ -85,10 +123,16 @@ export function CompactPopover() {
           </Badge>
         </div>
         <div className="flex items-center gap-[var(--space-2xs)]">
-          <IconButton label="Refresh">
-            <IconRefresh size={14} />
+          <IconButton label="Refresh" onClick={handleRefresh}>
+            <motion.span
+              animate={refreshing ? { rotate: 360 } : { rotate: 0 }}
+              transition={refreshing ? { duration: 0.7, ease: 'linear', repeat: Infinity } : { duration: 0.2 }}
+              style={{ display: 'inline-flex' }}
+            >
+              <IconRefresh size={14} />
+            </motion.span>
           </IconButton>
-          <IconButton label="Settings">
+          <IconButton label="Settings" onClick={() => setView('settings')}>
             <IconSettings size={14} />
           </IconButton>
         </div>
@@ -136,7 +180,7 @@ export function CompactPopover() {
               )}
               {extra?.is_enabled && (
                 <ExtraUsageSection
-                  pct={extra.utilization}
+                  pct={extra.utilization ?? 0}
                   resetsAt={extra.resets_at ?? null}
                   thresholds={thresholds}
                 />

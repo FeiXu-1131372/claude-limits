@@ -21,7 +21,12 @@ pub fn spawn(handle: AppHandle, state: Arc<AppState>) {
                 let s = state.settings.read();
                 Duration::from_secs(s.polling_interval_secs.max(60))
             };
-            tokio::time::sleep(interval).await;
+            // Sleep up to `interval`, but wake immediately if the user pressed
+            // the refresh button (or anything else called force_refresh.notify_one()).
+            tokio::select! {
+                _ = tokio::time::sleep(interval) => {}
+                _ = state.force_refresh.notified() => {}
+            }
 
             if let Some(cached) = &*state.cached_usage.read() {
                 if cached.is_stale(Utc::now())
@@ -56,12 +61,14 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
     let (token, _source, account) = match state.auth.get_access_token().await {
         Ok(t) => t,
         Err(AuthError::NoSource) => {
+            tray::set_level(handle, None, true);
             return PollResult::Transient;
         }
         Err(AuthError::Conflict {
             oauth_email,
             cli_email,
         }) => {
+            tray::set_level(handle, None, true);
             let _ = handle.emit(
                 "auth_source_conflict",
                 json!({
@@ -73,6 +80,7 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
         }
         Err(e) => {
             tracing::warn!("auth failure: {e}");
+            tray::set_level(handle, None, true);
             let _ = handle.emit("auth_required", ());
             return PollResult::Transient;
         }
@@ -114,6 +122,7 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
             PollResult::Ok
         }
         FetchOutcome::Unauthorized => {
+            tray::set_level(handle, None, true);
             let _ = handle.emit("auth_required", ());
             PollResult::Transient
         }

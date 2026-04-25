@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { CompactPopover } from './popover/CompactPopover';
 import { ExpandedReport } from './report/ExpandedReport';
@@ -13,17 +13,29 @@ export function App() {
   const usage = useAppStore((s) => s.usage);
   const authRequired = useAppStore((s) => s.authRequired);
   const conflict = useAppStore((s) => s.conflict);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    init();
+    init().finally(() => setInitialized(true));
   }, [init]);
 
   const label = getCurrentWindow().label;
+
+  if (!initialized) {
+    return (
+      <div className="flex h-full w-full items-center justify-center p-6">
+        <span className="text-[var(--color-text-muted)]">Loading…</span>
+      </div>
+    );
+  }
 
   if (conflict) {
     return <AuthConflictChooser />;
   }
 
+  // Only redirect to AuthPanel for an *explicit* auth-required signal, or when
+  // the first fetch returned no usage AND we have no Claude Code creds to fall
+  // back on. The initial null-usage state is handled by `initialized` above.
   if (authRequired || !usage) {
     return <AuthPanel />;
   }

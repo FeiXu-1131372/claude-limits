@@ -7,6 +7,7 @@ use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tokio::sync::Notify;
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct Settings {
@@ -54,6 +55,8 @@ pub struct AppState {
     pub cached_usage: RwLock<Option<CachedUsage>>,
     pub pending_oauth: RwLock<Option<PkcePair>>,
     pub fallback_dir: std::path::PathBuf,
+    // Wakes the poll loop early when the user requests an immediate refresh.
+    pub force_refresh: Notify,
 }
 
 impl AppState {
