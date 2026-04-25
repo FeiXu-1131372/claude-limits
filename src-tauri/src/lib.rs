@@ -116,6 +116,27 @@ pub fn run() {
             let handle = app.handle().clone();
             let state: Arc<AppState> = app.state::<Arc<AppState>>().inner().clone();
 
+            // Apply native vibrancy to the popover so it reads as a Control
+            // Center / Raycast-style menubar widget instead of a flat panel.
+            #[cfg(target_os = "macos")]
+            if let Some(popover) = app.get_webview_window("popover") {
+                use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
+                let _ = apply_vibrancy(
+                    &popover,
+                    NSVisualEffectMaterial::HudWindow,
+                    Some(NSVisualEffectState::Active),
+                    None,
+                );
+            }
+            #[cfg(target_os = "windows")]
+            if let Some(popover) = app.get_webview_window("popover") {
+                use window_vibrancy::{apply_acrylic, apply_mica};
+                // Try Mica first (Windows 11), fall back to acrylic (Windows 10).
+                if apply_mica(&popover, Some(true)).is_err() {
+                    let _ = apply_acrylic(&popover, Some((24, 22, 20, 200)));
+                }
+            }
+
             // Tray icon
             use tauri::menu::{MenuBuilder, MenuItem};
             use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};

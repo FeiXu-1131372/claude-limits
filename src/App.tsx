@@ -21,6 +21,14 @@ export function App() {
 
   const label = getCurrentWindow().label;
 
+  // Tag the body so CSS can render the popover with a transparent backdrop
+  // (so OS vibrancy shows through) while opaque windows like the report keep
+  // a solid surface.
+  useEffect(() => {
+    document.body.dataset.window = label;
+    return () => { delete document.body.dataset.window; };
+  }, [label]);
+
   if (!initialized) {
     return (
       <div className="flex h-full w-full items-center justify-center p-6">
