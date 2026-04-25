@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
-import type { SessionEvent } from '../lib/types';
 import { formatTokens, formatCost } from '../lib/format';
 import { IconSessions } from '../lib/icons';
 import { ipc } from '../lib/ipc';
+import { useTabData } from '../lib/useTabData';
 
 const MODEL_BADGE: Record<string, 'opus' | 'sonnet' | 'haiku' | 'default'> = {
   opus: 'opus',
@@ -30,19 +31,25 @@ function formatTime(iso: string): string {
 }
 
 export function SessionsTab() {
-  const [events, setEvents] = useState<SessionEvent[] | null>(null);
-
-  useEffect(() => {
-    ipc.getSessionHistory(7).then(setEvents).catch(() => setEvents([]));
-  }, []);
+  const { data: events, error, loading, reload } = useTabData(() => ipc.getSessionHistory(7));
 
   const totalCost = useMemo(
     () => (events ?? []).reduce((sum, s) => sum + s.cost_usd, 0),
     [events],
   );
 
-  if (events === null) {
-    return <p className="text-[var(--color-text-muted)]">Loading...</p>;
+  if (error) {
+    return (
+      <EmptyState
+        icon={<IconSessions size={32} />}
+        title="Couldn't load sessions"
+        description={error}
+        action={<Button variant="ghost" size="sm" onClick={reload}>Retry</Button>}
+      />
+    );
+  }
+  if (loading || !events) {
+    return <p className="text-[var(--color-text-muted)]">Loading…</p>;
   }
 
   if (events.length === 0) {

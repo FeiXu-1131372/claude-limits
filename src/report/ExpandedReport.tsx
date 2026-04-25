@@ -9,6 +9,7 @@ import { ProjectsTab } from './ProjectsTab';
 import { HeatmapTab } from './HeatmapTab';
 import { CacheTab } from './CacheTab';
 import { useAppStore } from '../lib/store';
+import { ipc } from '../lib/ipc';
 import { tabSlide } from '../lib/motion';
 import {
   IconSessions,
@@ -40,9 +41,23 @@ const TAB_COMPONENTS: Record<string, React.FC> = {
 
 export function ExpandedReport() {
   const [activeTab, setActiveTab] = useState('sessions');
+  const [refreshing, setRefreshing] = useState(false);
+  const [tabKey, setTabKey] = useState(0);
   const stale = useAppStore((s) => s.stale);
 
   const TabComponent = TAB_COMPONENTS[activeTab] ?? SessionsTab;
+
+  async function handleRefresh() {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await ipc.forceRefresh();
+      // Bump the tab key so the active tab remounts and re-fetches its data.
+      setTabKey((k) => k + 1);
+    } finally {
+      setTimeout(() => setRefreshing(false), 400);
+    }
+  }
 
   return (
     <div
@@ -66,8 +81,14 @@ export function ExpandedReport() {
           <span className="mono text-[var(--text-label)] text-[var(--color-text-muted)]">
             Last 30 days
           </span>
-          <IconButton label="Refresh">
-            <IconRefresh size={14} />
+          <IconButton label="Refresh" onClick={handleRefresh}>
+            <motion.span
+              animate={refreshing ? { rotate: 360 } : { rotate: 0 }}
+              transition={refreshing ? { duration: 0.7, ease: 'linear', repeat: Infinity } : { duration: 0.2 }}
+              style={{ display: 'inline-flex' }}
+            >
+              <IconRefresh size={14} />
+            </motion.span>
           </IconButton>
         </div>
       </div>
@@ -104,7 +125,7 @@ export function ExpandedReport() {
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto px-[var(--space-lg)] pb-[var(--space-lg)]">
         <motion.div
-          key={activeTab}
+          key={`${activeTab}-${tabKey}`}
           variants={tabSlide}
           initial="enter"
           animate="center"

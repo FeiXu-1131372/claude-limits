@@ -1,18 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
-import type { DailyBucket } from '../lib/types';
 import { formatTokens } from '../lib/format';
 import { IconTrends } from '../lib/icons';
 import { ipc } from '../lib/ipc';
+import { useTabData } from '../lib/useTabData';
 
 export function TrendsTab() {
-  const [data, setData] = useState<DailyBucket[] | null>(null);
+  const { data, error, loading, reload } = useTabData(() => ipc.getDailyTrends(30));
   const [range, setRange] = useState<'7d' | '30d'>('30d');
-
-  useEffect(() => {
-    ipc.getDailyTrends(30).then(setData).catch(() => setData([]));
-  }, []);
 
   const visibleData = useMemo(() => {
     if (!data) return [];
@@ -20,8 +17,18 @@ export function TrendsTab() {
     return data.slice(-days);
   }, [data, range]);
 
-  if (data === null) {
-    return <p className="text-[var(--color-text-muted)]">Loading...</p>;
+  if (error) {
+    return (
+      <EmptyState
+        icon={<IconTrends size={32} />}
+        title="Couldn't load trends"
+        description={error}
+        action={<Button variant="ghost" size="sm" onClick={reload}>Retry</Button>}
+      />
+    );
+  }
+  if (loading || !data) {
+    return <p className="text-[var(--color-text-muted)]">Loading…</p>;
   }
 
   if (data.length === 0) {

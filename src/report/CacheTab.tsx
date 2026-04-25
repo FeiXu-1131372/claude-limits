@@ -1,20 +1,26 @@
-import { useEffect, useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
-import type { CacheStats } from '../lib/types';
+import { Button } from '../components/ui/Button';
 import { formatTokens } from '../lib/format';
 import { IconCache } from '../lib/icons';
 import { ipc } from '../lib/ipc';
+import { useTabData } from '../lib/useTabData';
 
 export function CacheTab() {
-  const [data, setData] = useState<CacheStats | null>(null);
+  const { data, error, loading, reload } = useTabData(() => ipc.getCacheStats(30));
 
-  useEffect(() => {
-    ipc.getCacheStats(30).then(setData).catch(() => setData(null));
-  }, []);
-
-  if (!data) {
-    return <p className="text-[var(--color-text-muted)]">Loading...</p>;
+  if (error) {
+    return (
+      <EmptyState
+        icon={<IconCache size={32} />}
+        title="Couldn't load cache stats"
+        description={error}
+        action={<Button variant="ghost" size="sm" onClick={reload}>Retry</Button>}
+      />
+    );
+  }
+  if (loading || !data) {
+    return <p className="text-[var(--color-text-muted)]">Loading…</p>;
   }
 
   const totalCacheTokens = data.total_cache_read_tokens + data.total_cache_creation_tokens;

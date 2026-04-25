@@ -1,20 +1,26 @@
-import { useEffect, useState } from 'react';
 import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
-import type { ProjectStats } from '../lib/types';
 import { formatCost } from '../lib/format';
 import { IconChart } from '../lib/icons';
 import { ipc } from '../lib/ipc';
+import { useTabData } from '../lib/useTabData';
 
 export function ProjectsTab() {
-  const [data, setData] = useState<ProjectStats[] | null>(null);
+  const { data, error, loading, reload } = useTabData(() => ipc.getProjectBreakdown(30));
 
-  useEffect(() => {
-    ipc.getProjectBreakdown(30).then(setData).catch(() => setData([]));
-  }, []);
-
-  if (data === null) {
-    return <p className="text-[var(--color-text-muted)]">Loading...</p>;
+  if (error) {
+    return (
+      <EmptyState
+        icon={<IconChart size={32} />}
+        title="Couldn't load projects"
+        description={error}
+        action={<Button variant="ghost" size="sm" onClick={reload}>Retry</Button>}
+      />
+    );
+  }
+  if (loading || !data) {
+    return <p className="text-[var(--color-text-muted)]">Loading…</p>;
   }
 
   if (data.length === 0) {

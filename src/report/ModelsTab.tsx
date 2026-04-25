@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
-import type { ModelStats, CacheStats } from '../lib/types';
 import { formatTokens, formatCost } from '../lib/format';
 import { IconChart } from '../lib/icons';
 import { ipc } from '../lib/ipc';
+import { useTabData } from '../lib/useTabData';
 
 const MODEL_VARIANT: Record<string, 'opus' | 'sonnet' | 'haiku' | 'default'> = {
   opus: 'opus',
@@ -27,17 +28,11 @@ function shortName(model: string): string {
 }
 
 export function ModelsTab() {
-  const [models, setModels] = useState<ModelStats[] | null>(null);
-  const [cache, setCache] = useState<CacheStats | null>(null);
-
-  useEffect(() => {
-    Promise.all([ipc.getModelBreakdown(30), ipc.getCacheStats(30)])
-      .then(([m, c]) => {
-        setModels(m);
-        setCache(c);
-      })
-      .catch(() => setModels([]));
-  }, []);
+  const { data, error, loading, reload } = useTabData(() =>
+    Promise.all([ipc.getModelBreakdown(30), ipc.getCacheStats(30)]).then(([m, c]) => ({ models: m, cache: c })),
+  );
+  const models = data?.models ?? null;
+  const cache = data?.cache ?? null;
 
   const totalTokens = useMemo(
     () => (models ?? []).reduce((s, m) => s + m.input_tokens + m.output_tokens, 0),
@@ -57,8 +52,18 @@ export function ModelsTab() {
     }));
   }, [models, totalTokens]);
 
-  if (models === null || cache === null) {
-    return <p className="text-[var(--color-text-muted)]">Loading...</p>;
+  if (error) {
+    return (
+      <EmptyState
+        icon={<IconChart size={32} />}
+        title="Couldn't load models"
+        description={error}
+        action={<Button variant="ghost" size="sm" onClick={reload}>Retry</Button>}
+      />
+    );
+  }
+  if (loading || !models || !cache) {
+    return <p className="text-[var(--color-text-muted)]">Loading…</p>;
   }
 
   if (models.length === 0) {

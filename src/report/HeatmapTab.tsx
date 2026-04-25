@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { EmptyState } from '../components/ui/EmptyState';
+import { Button } from '../components/ui/Button';
 import type { HeatmapCell, SessionEvent } from '../lib/types';
 import { formatTokens } from '../lib/format';
 import { IconHeatmap } from '../lib/icons';
 import { ipc } from '../lib/ipc';
+import { useTabData } from '../lib/useTabData';
 
 const CELL_SIZE = 11;
 const CELL_GAP = 3;
@@ -59,11 +61,7 @@ const levelColors: Record<number, string> = {
 };
 
 export function HeatmapTab() {
-  const [events, setEvents] = useState<SessionEvent[] | null>(null);
-
-  useEffect(() => {
-    ipc.getSessionHistory(180).then(setEvents).catch(() => setEvents([]));
-  }, []);
+  const { data: events, error, loading, reload } = useTabData(() => ipc.getSessionHistory(180));
 
   const data = useMemo(() => (events ? sessionsToHeatmap(events) : []), [events]);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -80,8 +78,19 @@ export function HeatmapTab() {
 
   const monthPositions = useMemo(() => getMonthPositions(data), [data]);
 
-  if (!events) {
-    return <p className="text-[var(--color-text-muted)]">Loading...</p>;
+  if (error) {
+    return (
+      <EmptyState
+        icon={<IconHeatmap size={32} />}
+        title="Couldn't load heatmap"
+        description={error}
+        action={<Button variant="ghost" size="sm" onClick={reload}>Retry</Button>}
+      />
+    );
+  }
+
+  if (loading || !events) {
+    return <p className="text-[var(--color-text-muted)]">Loading…</p>;
   }
 
   if (data.length === 0) {
