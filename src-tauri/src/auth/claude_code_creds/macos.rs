@@ -2,7 +2,7 @@
 
 use super::super::StoredToken;
 use anyhow::{anyhow, Context, Result};
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{TimeZone, Utc};
 use serde::Deserialize;
 use std::process::Command;
 

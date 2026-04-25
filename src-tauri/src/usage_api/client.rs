@@ -1,5 +1,5 @@
 use super::types::UsageSnapshot;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use chrono::Utc;
 use reqwest::{Client, StatusCode};
 use std::time::Duration;

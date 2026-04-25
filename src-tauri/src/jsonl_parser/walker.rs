@@ -3,7 +3,7 @@ use super::pricing::PricingTable;
 use crate::store::{Db, StoredSessionEvent};
 use anyhow::{Context, Result};
 use std::fs::{self, File};
-use std::io::{BufRead, Read, Seek, SeekFrom};
+use std::io::{BufRead, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 const MAX_FILE_BYTES: u64 = 100 * 1024 * 1024;

@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use fs4::FileExt;
 use rusqlite::Connection;
 use std::fs::File;
 use std::path::{Path, PathBuf};

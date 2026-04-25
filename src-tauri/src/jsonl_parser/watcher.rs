@@ -2,7 +2,7 @@ use super::pricing::PricingTable;
 use super::walker;
 use crate::store::Db;
 use anyhow::Result;
-use notify::{RecursiveMode, Watcher};
+use notify::RecursiveMode;
 use notify_debouncer_full::{new_debouncer, DebouncedEvent};
 use std::path::PathBuf;
 use std::sync::Arc;
