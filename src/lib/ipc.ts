@@ -35,4 +35,6 @@ export const ipc = {
   getSettings: () => invoke<Settings>("get_settings"),
   updateSettings: (s: Settings) =>
     invoke<void>("update_settings", { s }),
+
+  openExpandedWindow: () => invoke<void>("open_expanded_window"),
 };

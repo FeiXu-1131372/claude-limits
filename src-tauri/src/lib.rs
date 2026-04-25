@@ -52,6 +52,7 @@ pub fn run() {
             commands::has_claude_code_creds,
             commands::update_settings,
             commands::get_settings,
+            commands::open_expanded_window,
         ]);
 
     #[cfg(debug_assertions)]
@@ -97,8 +98,9 @@ pub fn run() {
             use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
             let show = MenuItem::with_id(app, "show", "Show popover", true, None::<&str>)?;
+            let expand = MenuItem::with_id(app, "expand", "Open expanded report", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = MenuBuilder::new(app).items(&[&show, &quit]).build()?;
+            let menu = MenuBuilder::new(app).items(&[&show, &expand, &quit]).build()?;
 
             TrayIconBuilder::with_id("main")
                 .tooltip("Claude Usage Monitor")
@@ -110,6 +112,12 @@ pub fn run() {
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(w) = app.get_webview_window("popover") {
+                            let _ = w.show();
+                            let _ = w.set_focus();
+                        }
+                    }
+                    "expand" => {
+                        if let Some(w) = app.get_webview_window("report") {
                             let _ = w.show();
                             let _ = w.set_focus();
                         }

@@ -266,3 +266,14 @@ pub async fn debug_force_threshold(
     tracing::info!("debug_force_threshold({bucket}, {pct})");
     Ok(())
 }
+
+#[command]
+#[specta::specta]
+pub async fn open_expanded_window(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    if let Some(w) = app.get_webview_window("report") {
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+    Ok(())
+}

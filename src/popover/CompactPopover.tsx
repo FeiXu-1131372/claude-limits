@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { IconButton } from '../components/ui/IconButton';
 import { UsageBar } from './UsageBar';
 import { useAppStore } from '../lib/store';
+import { ipc } from '../lib/ipc';
 import { popoverMount, cardStagger, cardChild } from '../lib/motion';
 import { IconRefresh, IconSettings } from '../lib/icons';
 
@@ -150,7 +151,7 @@ export function CompactPopover() {
         <span className="mono text-[var(--text-micro)] text-[var(--color-text-muted)]">
           Updated {updatedAgo}
         </span>
-        <Button variant="primary" size="sm">
+        <Button variant="primary" size="sm" onClick={() => ipc.openExpandedWindow()}>
           See details
         </Button>
       </div>
