@@ -6,6 +6,7 @@ mod logging;
 pub mod notifier;
 mod poll_loop;
 pub mod store;
+mod tray;
 pub mod usage_api;
 
 use app_state::AppState;
@@ -90,6 +91,52 @@ pub fn run() {
             use tauri::Manager;
             let handle = app.handle().clone();
             let state: Arc<AppState> = app.state::<Arc<AppState>>().inner().clone();
+
+            // Tray icon
+            use tauri::menu::{MenuBuilder, MenuItem};
+            use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+
+            let show = MenuItem::with_id(app, "show", "Show popover", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = MenuBuilder::new(app).items(&[&show, &quit]).build()?;
+
+            TrayIconBuilder::with_id("main")
+                .tooltip("Claude Usage Monitor")
+                .icon(tauri::image::Image::from_bytes(include_bytes!(
+                    "../icons/tray/idle-template.png"
+                ))?)
+                .icon_as_template(true)
+                .menu(&menu)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(w) = app.get_webview_window("popover") {
+                            let _ = w.show();
+                            let _ = w.set_focus();
+                        }
+                    }
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(w) = app.get_webview_window("popover") {
+                            if w.is_visible().unwrap_or(false) {
+                                let _ = w.hide();
+                            } else {
+                                let _ = w.show();
+                                let _ = w.set_focus();
+                            }
+                        }
+                    }
+                })
+                .build(app)?;
+
             poll_loop::spawn(handle.clone(), state.clone());
 
             if let Some(root) = jsonl_parser::walker::claude_projects_root() {
