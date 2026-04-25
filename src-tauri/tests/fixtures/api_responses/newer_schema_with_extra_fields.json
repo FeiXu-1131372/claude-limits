@@ -1,0 +1,9 @@
+{
+  "five_hour": { "utilization": 10.0, "resets_at": "2026-04-24T18:00:00Z", "pinned": false },
+  "seven_day": { "utilization": 20.0, "resets_at": "2026-04-30T09:00:00Z" },
+  "seven_day_sonnet": null,
+  "seven_day_opus": null,
+  "extra_usage": null,
+  "future_field_we_do_not_know": { "nested": "value" },
+  "organization_plan": "team-pro"
+}
