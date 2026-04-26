@@ -33,11 +33,6 @@
         "visible": false
       }
     ],
-    "trayIcon": {
-      "iconPath": "icons/tray/idle-template.png",
-      "iconAsTemplate": true,
-      "menuOnLeftClick": false
-    },
     "security": {
       "csp": null
     }
