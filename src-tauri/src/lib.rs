@@ -256,6 +256,18 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|app, event| {
+            // On graceful exit (Cmd+Q, app.exit, SIGINT/SIGTERM), explicitly
+            // remove our tray icon. Tauri's drop handler usually does this,
+            // but being explicit guards against macOS leaving an orphaned
+            // NSStatusItem in the menu bar — which is the dev-mode pain
+            // we've been hitting where every restart leaves a ghost icon.
+            // (Hard SIGKILL still strands the icon — there's no userland fix
+            // for that on macOS short of logout.)
+            if matches!(event, tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit) {
+                let _ = app.remove_tray_by_id("main");
+            }
+        });
 }
