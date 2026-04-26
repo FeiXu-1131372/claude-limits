@@ -81,16 +81,16 @@ export function AuthPanel() {
         {/* Icon */}
         <div className="flex justify-center">
           <div className="w-[48px] h-[48px] rounded-[var(--radius-lg)] bg-[var(--color-accent-dim)] flex items-center justify-center">
-            <IconAuth size={24} className="text-[var(--color-accent)]" />
+            <IconAuth size={24} className="text-[color:var(--color-accent)]" />
           </div>
         </div>
 
         {/* Title */}
         <div className="text-center flex flex-col gap-[var(--space-xs)]">
-          <h1 className="text-[var(--text-title)] font-[var(--weight-semibold)] text-[var(--color-text)]">
+          <h1 className="text-[length:var(--text-title)] font-[var(--weight-semibold)] text-[color:var(--color-text)]">
             Connect to Claude
           </h1>
-          <p className="text-[var(--text-label)] text-[var(--color-text-muted)] leading-[var(--leading-label)]">
+          <p className="text-[length:var(--text-label)] text-[color:var(--color-text-muted)] leading-[var(--leading-label)]">
             {step === 'paste'
               ? 'Paste the code shown on the callback page:'
               : 'Choose how to authenticate. Your credentials stay on this device.'}
@@ -105,13 +105,13 @@ export function AuthPanel() {
                 className="w-full flex items-center gap-[var(--space-sm)] text-left"
               >
                 <div className="w-[32px] h-[32px] rounded-[var(--radius-sm)] bg-[var(--color-accent-dim)] flex items-center justify-center shrink-0">
-                  <ExternalLink size={14} className="text-[var(--color-accent)]" />
+                  <ExternalLink size={14} className="text-[color:var(--color-accent)]" />
                 </div>
                 <div className="flex flex-col gap-[2px] flex-1">
-                  <span className="text-[var(--text-body)] font-[var(--weight-medium)] text-[var(--color-text)]">
+                  <span className="text-[length:var(--text-body)] font-[var(--weight-medium)] text-[color:var(--color-text)]">
                     Sign in with Claude
                   </span>
-                  <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">
+                  <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
                     Opens browser for secure OAuth
                   </span>
                 </div>
@@ -125,13 +125,13 @@ export function AuthPanel() {
                   className="w-full flex items-center gap-[var(--space-sm)] text-left"
                 >
                   <div className="w-[32px] h-[32px] rounded-[var(--radius-sm)] bg-[var(--color-track)] flex items-center justify-center shrink-0">
-                    <IconAuth size={14} className="text-[var(--color-text-secondary)]" />
+                    <IconAuth size={14} className="text-[color:var(--color-text-secondary)]" />
                   </div>
                   <div className="flex flex-col gap-[2px] flex-1">
-                    <span className="text-[var(--text-body)] font-[var(--weight-medium)] text-[var(--color-text)]">
+                    <span className="text-[length:var(--text-body)] font-[var(--weight-medium)] text-[color:var(--color-text)]">
                       Use Claude Code credentials
                     </span>
-                    <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">
+                    <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
                       Reads from your existing session
                     </span>
                   </div>
@@ -145,11 +145,11 @@ export function AuthPanel() {
           <div className="flex flex-col gap-[var(--space-sm)]">
             {authorizeUrl && (
               <div className="flex flex-col gap-[var(--space-2xs)]">
-                <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">
+                <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
                   Authorize URL (browser should have opened):
                 </span>
                 <div className="flex items-center gap-[var(--space-2xs)]">
-                  <code className="flex-1 truncate rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-[var(--space-xs)] py-[var(--space-2xs)] mono text-[var(--text-micro)] text-[var(--color-text-secondary)]">
+                  <code className="flex-1 truncate rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-[var(--space-xs)] py-[var(--space-2xs)] mono text-[length:var(--text-micro)] text-[color:var(--color-text-secondary)]">
                     {authorizeUrl}
                   </code>
                   <Button
@@ -164,7 +164,7 @@ export function AuthPanel() {
             )}
             <input
               autoFocus
-              className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-[var(--space-sm)] py-[var(--space-xs)] mono text-[var(--text-label)] text-[var(--color-text)] w-full"
+              className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-[var(--space-sm)] py-[var(--space-xs)] mono text-[length:var(--text-label)] text-[color:var(--color-text)] w-full"
               placeholder="code#state"
               value={code}
               onChange={(e) => {
@@ -189,21 +189,21 @@ export function AuthPanel() {
 
         {step === 'submitting' && (
           <div className="flex items-center justify-center gap-[var(--space-sm)]">
-            <IconRefresh size={14} className="text-[var(--color-accent)] animate-spin" />
-            <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">
+            <IconRefresh size={14} className="text-[color:var(--color-accent)] animate-spin" />
+            <span className="text-[length:var(--text-label)] text-[color:var(--color-text-muted)]">
               Verifying...
             </span>
           </div>
         )}
 
         {error && (
-          <p className="text-[var(--text-label)] text-[var(--color-danger)]">
+          <p className="text-[length:var(--text-label)] text-[color:var(--color-danger)]">
             {error}
           </p>
         )}
 
         {/* Security note */}
-        <p className="text-[var(--text-micro)] text-[var(--color-text-muted)] text-center">
+        <p className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)] text-center">
           Credentials are stored in your OS keychain and never leave this device.
         </p>
       </motion.div>

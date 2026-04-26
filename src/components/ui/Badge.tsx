@@ -9,16 +9,16 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 const variantClasses: Record<BadgeVariant, string> = {
-  default: 'bg-[var(--color-track)] text-[var(--color-text-secondary)]',
-  accent: 'bg-[var(--color-accent-dim)] text-[var(--color-accent)]',
-  safe: 'bg-[var(--color-safe-dim)] text-[var(--color-safe)]',
-  warn: 'bg-[var(--color-warn-dim)] text-[var(--color-warn)]',
-  danger: 'bg-[var(--color-danger-dim)] text-[var(--color-danger)]',
-  live: 'bg-[var(--color-safe-dim)] text-[var(--color-safe)]',
-  stale: 'bg-[var(--color-track)] text-[var(--color-text-muted)]',
-  opus: 'bg-[var(--color-accent-dim)] text-[var(--color-accent)]',
-  sonnet: 'bg-[var(--color-warn-dim)] text-[var(--color-warn)]',
-  haiku: 'bg-[var(--color-safe-dim)] text-[var(--color-safe)]',
+  default: 'bg-[var(--color-track)] text-[color:var(--color-text-secondary)]',
+  accent: 'bg-[var(--color-accent-dim)] text-[color:var(--color-accent)]',
+  safe: 'bg-[var(--color-safe-dim)] text-[color:var(--color-safe)]',
+  warn: 'bg-[var(--color-warn-dim)] text-[color:var(--color-warn)]',
+  danger: 'bg-[var(--color-danger-dim)] text-[color:var(--color-danger)]',
+  live: 'bg-[var(--color-safe-dim)] text-[color:var(--color-safe)]',
+  stale: 'bg-[var(--color-track)] text-[color:var(--color-text-muted)]',
+  opus: 'bg-[var(--color-accent-dim)] text-[color:var(--color-accent)]',
+  sonnet: 'bg-[var(--color-warn-dim)] text-[color:var(--color-warn)]',
+  haiku: 'bg-[var(--color-safe-dim)] text-[color:var(--color-safe)]',
 };
 
 export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
@@ -29,7 +29,7 @@ export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
         'inline-flex items-center gap-[var(--space-2xs)]',
         'px-[7px] py-[2px]',
         'rounded-[var(--radius-pill)]',
-        'text-[var(--text-micro)] font-[var(--weight-medium)]',
+        'text-[length:var(--text-micro)] font-[var(--weight-medium)]',
         'select-none',
         variantClasses[variant],
         className,

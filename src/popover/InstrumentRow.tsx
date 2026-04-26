@@ -52,7 +52,7 @@ export function InstrumentColumn({
   return (
     <div className="flex flex-col gap-[10px]">
       {/* Eyebrow label */}
-      <span className="text-[var(--text-micro)] font-[var(--weight-medium)] tracking-[var(--tracking-label)] uppercase text-[var(--color-text-muted)]">
+      <span className="text-[length:var(--text-micro)] font-[var(--weight-medium)] tracking-[var(--tracking-label)] uppercase text-[color:var(--color-text-muted)]">
         {label}
       </span>
 
@@ -60,7 +60,7 @@ export function InstrumentColumn({
       <div className="flex items-baseline gap-[2px]">
         {value == null ? (
           <span
-            className="text-[var(--text-display)] text-[var(--color-text-muted)] leading-[var(--leading-display)]"
+            className="text-[length:var(--text-display)] text-[color:var(--color-text-muted)] leading-[var(--leading-display)]"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             —
@@ -69,7 +69,7 @@ export function InstrumentColumn({
           <>
             <HeroNumber value={Math.round(value)} />
             <span
-              className="text-[var(--text-pct)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+              className="text-[length:var(--text-pct)] font-[var(--weight-medium)] text-[color:var(--color-text-secondary)]"
               style={{
                 fontFamily: 'var(--font-mono)',
                 lineHeight: 'var(--leading-hero)',
@@ -85,16 +85,25 @@ export function InstrumentColumn({
       {/* Hairline meter */}
       <Meter value={clamped} level={level} />
 
-      {/* Caption: reset countdown */}
-      <span className="h-[14px] text-[var(--text-micro)] text-[var(--color-text-muted)]">
-        {data?.resets_at ? <ResetCountdown resetsAt={data.resets_at} /> : ' '}
-      </span>
+      {/* Caption — leading-tight so it occupies a single line predictably,
+       * and a min-height so all columns line up when one bucket has no
+       * reset_at to show. */}
+      <div className="min-h-[16px] leading-[1.4]">
+        {data?.resets_at && <ResetCountdown resetsAt={data.resets_at} />}
+      </div>
     </div>
   );
 }
 
 /* ─── Secondary instrument: inline row ─── */
 
+/**
+ * Inline row instrument — used for sub-rows like Opus / Sonnet (which inherit
+ * the parent 7d window's reset cycle so don't need their own countdown) and
+ * for Pay-as-you-go (which uses the optional `caption` prop for "no reset
+ * window" notes). The reset countdown is intentionally *not* shown here —
+ * the column-level instrument carries that.
+ */
 export function InstrumentRow({
   label,
   caption,
@@ -118,17 +127,17 @@ export function InstrumentRow({
     <div className="flex flex-col gap-[6px]">
       <div className="flex items-baseline justify-between gap-[var(--space-sm)] min-w-0">
         <div className="flex items-baseline gap-[var(--space-xs)] min-w-0">
-          <span className="text-[var(--text-label)] font-[var(--weight-medium)] text-[var(--color-text-secondary)] truncate">
+          <span className="text-[length:var(--text-label)] font-[var(--weight-medium)] text-[color:var(--color-text-secondary)] truncate">
             {label}
           </span>
-          {(data?.resets_at || caption) && (
-            <span className="text-[var(--text-micro)] text-[var(--color-text-muted)] truncate">
-              {data?.resets_at ? <ResetCountdown resetsAt={data.resets_at} /> : caption}
+          {caption && (
+            <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)] truncate">
+              {caption}
             </span>
           )}
         </div>
         <span
-          className="text-[var(--text-pct)] font-[var(--weight-medium)] tabular-nums leading-none shrink-0"
+          className="text-[length:var(--text-pct)] font-[var(--weight-medium)] tabular-nums leading-none shrink-0"
           style={{
             fontFamily: 'var(--font-mono)',
             color: v == null ? 'var(--color-text-muted)' : 'var(--color-text)',
@@ -171,7 +180,7 @@ function HeroNumber({ value }: { value: number }) {
   // Render so leading zero behavior is sensible: 7 → "7", 11 → "11", 100 → "100".
   return (
     <span
-      className="font-[var(--weight-medium)] tabular-nums text-[var(--color-text)] inline-block"
+      className="font-[var(--weight-medium)] tabular-nums text-[color:var(--color-text)] inline-block"
       style={{
         fontFamily: 'var(--font-mono)',
         fontSize: 'var(--text-hero)',

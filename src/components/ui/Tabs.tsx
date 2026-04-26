@@ -97,12 +97,12 @@ const Tab = forwardRef<HTMLButtonElement, TabProps>(
       aria-selected={active}
       className={[
         'px-[var(--space-sm)] py-[var(--space-xs)]',
-        'text-[var(--text-label)] font-[var(--weight-medium)]',
+        'text-[length:var(--text-label)] font-[var(--weight-medium)]',
         'rounded-[var(--radius-sm)] select-none whitespace-nowrap',
         'transition-[background,color] duration-[var(--duration-fast)] ease-[var(--ease-out)]',
         active
-          ? 'bg-[var(--color-bg-card)] text-[var(--color-text)] shadow-[0_1px_2px_rgba(0,0,0,0.1)]'
-          : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]',
+          ? 'bg-[var(--color-bg-card)] text-[color:var(--color-text)] shadow-[0_1px_2px_rgba(0,0,0,0.1)]'
+          : 'text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text-secondary)]',
         'focus-visible:outline-2 focus-visible:outline-[var(--color-border-focus)] focus-visible:outline-offset-1',
         className,
       ].join(' ')}

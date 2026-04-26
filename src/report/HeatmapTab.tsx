@@ -90,7 +90,7 @@ export function HeatmapTab() {
   }
 
   if (loading || !events) {
-    return <p className="text-[var(--color-text-muted)]">Loading…</p>;
+    return <p className="text-[color:var(--color-text-muted)]">Loading…</p>;
   }
 
   if (data.length === 0) {
@@ -110,11 +110,11 @@ export function HeatmapTab() {
     <div className="flex flex-col gap-[var(--space-md)]">
       {/* Legend */}
       <div className="flex items-center justify-between px-[var(--space-2xs)]">
-        <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">
+        <span className="text-[length:var(--text-label)] text-[color:var(--color-text-muted)]">
           Last 6 months
         </span>
         <div className="flex items-center gap-[var(--space-2xs)]">
-          <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">Less</span>
+          <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">Less</span>
           {[0, 1, 2, 3, 4].map((level) => (
             <div
               key={level}
@@ -122,7 +122,7 @@ export function HeatmapTab() {
               style={{ background: levelColors[level] }}
             />
           ))}
-          <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">More</span>
+          <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">More</span>
         </div>
       </div>
 
@@ -210,10 +210,10 @@ export function HeatmapTab() {
 
       {/* Summary */}
       <div className="flex items-center gap-[var(--space-md)] px-[var(--space-2xs)]">
-        <span className="mono text-[var(--text-label)] text-[var(--color-text-secondary)]">
+        <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-secondary)]">
           {data.filter((c) => c.level > 0).length} active days
         </span>
-        <span className="mono text-[var(--text-label)] text-[var(--color-text-muted)]">
+        <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-muted)]">
           {formatTokens(totalValue)} total
         </span>
       </div>

@@ -35,11 +35,11 @@ export const Slider = forwardRef<HTMLInputElement, SliderProps>(
         <div className="flex items-center justify-between">
           <label
             htmlFor={id}
-            className="text-[var(--text-label)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+            className="text-[length:var(--text-label)] font-[var(--weight-medium)] text-[color:var(--color-text-secondary)]"
           >
             {label}
           </label>
-          <span className="mono text-[var(--text-label)] font-[var(--weight-semibold)] text-[var(--color-accent)]">
+          <span className="mono text-[length:var(--text-label)] font-[var(--weight-semibold)] text-[color:var(--color-accent)]">
             {formatValue(value)}
           </span>
         </div>

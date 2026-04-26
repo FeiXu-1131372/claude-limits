@@ -10,10 +10,10 @@ interface BannerProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 const variantClasses: Record<BannerVariant, string> = {
-  info: 'bg-[var(--color-accent-dim)] border-[var(--color-accent)]/20 text-[var(--color-accent)]',
-  warning: 'bg-[var(--color-warn-dim)] border-[var(--color-warn)]/20 text-[var(--color-warn)]',
-  error: 'bg-[var(--color-danger-dim)] border-[var(--color-danger)]/20 text-[var(--color-danger)]',
-  stale: 'bg-[var(--color-track)] border-[var(--color-border)] text-[var(--color-text-secondary)]',
+  info: 'bg-[var(--color-accent-dim)] border-[var(--color-accent)]/20 text-[color:var(--color-accent)]',
+  warning: 'bg-[var(--color-warn-dim)] border-[var(--color-warn)]/20 text-[color:var(--color-warn)]',
+  error: 'bg-[var(--color-danger-dim)] border-[var(--color-danger)]/20 text-[color:var(--color-danger)]',
+  stale: 'bg-[var(--color-track)] border-[var(--color-border)] text-[color:var(--color-text-secondary)]',
 };
 
 export const Banner = forwardRef<HTMLDivElement, BannerProps>(
@@ -25,7 +25,7 @@ export const Banner = forwardRef<HTMLDivElement, BannerProps>(
         'flex items-center gap-[var(--space-sm)]',
         'px-[var(--space-md)] py-[var(--space-sm)]',
         'rounded-[var(--radius-sm)] border',
-        'text-[var(--text-label)] font-[var(--weight-medium)]',
+        'text-[length:var(--text-label)] font-[var(--weight-medium)]',
         variantClasses[variant],
         className,
       ].join(' ')}

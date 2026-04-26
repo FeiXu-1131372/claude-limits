@@ -20,15 +20,15 @@ export const EmptyState = forwardRef<HTMLDivElement, EmptyStateProps>(
       {...props}
     >
       {icon && (
-        <div className="text-[var(--color-text-muted)] opacity-40 mb-[var(--space-xs)]">
+        <div className="text-[color:var(--color-text-muted)] opacity-40 mb-[var(--space-xs)]">
           {icon}
         </div>
       )}
-      <p className="text-[var(--text-body)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]">
+      <p className="text-[length:var(--text-body)] font-[var(--weight-medium)] text-[color:var(--color-text-secondary)]">
         {title}
       </p>
       {description && (
-        <p className="text-[var(--text-micro)] text-[var(--color-text-muted)] max-w-[240px]">
+        <p className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)] max-w-[240px]">
           {description}
         </p>
       )}

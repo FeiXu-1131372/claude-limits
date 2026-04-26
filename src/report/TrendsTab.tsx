@@ -28,7 +28,7 @@ export function TrendsTab() {
     );
   }
   if (loading || !data) {
-    return <p className="text-[var(--color-text-muted)]">Loading…</p>;
+    return <p className="text-[color:var(--color-text-muted)]">Loading…</p>;
   }
 
   if (data.length === 0) {
@@ -57,12 +57,12 @@ export function TrendsTab() {
             onClick={() => setRange(r)}
             className={[
               'px-[var(--space-sm)] py-[var(--space-2xs)]',
-              'text-[var(--text-label)] font-[var(--weight-medium)]',
+              'text-[length:var(--text-label)] font-[var(--weight-medium)]',
               'rounded-[var(--radius-sm)]',
               'transition-[background,color] duration-[var(--duration-fast)]',
               range === r
-                ? 'bg-[var(--color-bg-card)] text-[var(--color-text)]'
-                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]',
+                ? 'bg-[var(--color-bg-card)] text-[color:var(--color-text)]'
+                : 'text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text-secondary)]',
             ].join(' ')}
           >
             {r}
@@ -101,13 +101,13 @@ export function TrendsTab() {
                 {/* Tooltip */}
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-[var(--space-xs)] hidden group-hover:block z-10">
                   <div className="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius-sm)] px-[var(--space-sm)] py-[var(--space-xs)] whitespace-nowrap">
-                    <div className="text-[var(--text-micro)] text-[var(--color-text-muted)]">
+                    <div className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
                       {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </div>
-                    <div className="mono text-[var(--text-label)] text-[var(--color-text)]">
+                    <div className="mono text-[length:var(--text-label)] text-[color:var(--color-text)]">
                       {formatTokens(total)}
                     </div>
-                    <div className="mono text-[var(--text-micro)] text-[var(--color-text-muted)]">
+                    <div className="mono text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
                       ${day.cost_usd.toFixed(2)}
                     </div>
                   </div>
@@ -122,7 +122,7 @@ export function TrendsTab() {
           {visibleData
             .filter((_, i) => i % (range === '7d' ? 1 : 5) === 0)
             .map((day) => (
-              <span key={day.date} className="text-[var(--text-micro)] text-[var(--color-text-muted)] mono">
+              <span key={day.date} className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)] mono">
                 {new Date(day.date).toLocaleDateString('en-US', { day: 'numeric' })}
               </span>
             ))}
@@ -131,11 +131,11 @@ export function TrendsTab() {
 
       {/* Summary */}
       <div className="flex items-center gap-[var(--space-md)] px-[var(--space-2xs)]">
-        <span className="mono text-[var(--text-label)] text-[var(--color-text-secondary)]">
+        <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-secondary)]">
           Avg {formatTokens(visibleData.reduce((s, d) => s + d.input_tokens + d.output_tokens, 0) / visibleData.length)}
         </span>
-        <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">·</span>
-        <span className="mono text-[var(--text-label)] text-[var(--color-text-secondary)]">
+        <span className="text-[length:var(--text-label)] text-[color:var(--color-text-muted)]">·</span>
+        <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-secondary)]">
           ${visibleData.reduce((s, d) => s + d.cost_usd, 0).toFixed(2)} total
         </span>
       </div>

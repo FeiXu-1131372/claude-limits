@@ -63,7 +63,7 @@ export function ModelsTab() {
     );
   }
   if (loading || !models || !cache) {
-    return <p className="text-[var(--color-text-muted)]">Loading…</p>;
+    return <p className="text-[color:var(--color-text-muted)]">Loading…</p>;
   }
 
   if (models.length === 0) {
@@ -117,10 +117,10 @@ export function ModelsTab() {
             })}
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="mono text-[var(--text-title)] font-[var(--weight-semibold)] text-[var(--color-text)]">
+            <span className="mono text-[length:var(--text-title)] font-[var(--weight-semibold)] text-[color:var(--color-text)]">
               {formatTokens(totalTokens)}
             </span>
-            <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">tokens</span>
+            <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">tokens</span>
           </div>
         </div>
       </div>
@@ -150,10 +150,10 @@ export function ModelsTab() {
                 </div>
               </div>
               <div className="flex items-center gap-[var(--space-md)] shrink-0">
-                <span className="mono text-[var(--text-label)] text-[var(--color-text-secondary)] tabular-nums min-w-[52px] text-right">
+                <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-secondary)] tabular-nums min-w-[52px] text-right">
                   {seg.pct.toFixed(0)}%
                 </span>
-                <span className="mono text-[var(--text-label)] text-[var(--color-text-muted)] tabular-nums min-w-[48px] text-right">
+                <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-muted)] tabular-nums min-w-[48px] text-right">
                   {formatCost(seg.cost_usd)}
                 </span>
               </div>
@@ -164,19 +164,19 @@ export function ModelsTab() {
 
       {/* Cache efficiency */}
       <Card className="p-[var(--space-md)]">
-        <h3 className="text-[var(--text-label)] font-[var(--weight-medium)] text-[var(--color-text-muted)] mb-[var(--space-sm)]">
+        <h3 className="text-[length:var(--text-label)] font-[var(--weight-medium)] text-[color:var(--color-text-muted)] mb-[var(--space-sm)]">
           Cache efficiency (30d)
         </h3>
         <div className="grid grid-cols-2 gap-[var(--space-sm)]">
           <div>
-            <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">Hit ratio</span>
-            <p className="mono text-[var(--text-body)] font-[var(--weight-semibold)] text-[var(--color-text)]">
+            <span className="text-[length:var(--text-label)] text-[color:var(--color-text-muted)]">Hit ratio</span>
+            <p className="mono text-[length:var(--text-body)] font-[var(--weight-semibold)] text-[color:var(--color-text)]">
               {(cache.hit_ratio * 100).toFixed(1)}%
             </p>
           </div>
           <div>
-            <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">Est. savings</span>
-            <p className="mono text-[var(--text-body)] font-[var(--weight-semibold)] text-[var(--color-safe)]">
+            <span className="text-[length:var(--text-label)] text-[color:var(--color-text-muted)]">Est. savings</span>
+            <p className="mono text-[length:var(--text-body)] font-[var(--weight-semibold)] text-[color:var(--color-safe)]">
               ${cache.estimated_savings_usd.toFixed(2)}
             </p>
           </div>
@@ -185,8 +185,8 @@ export function ModelsTab() {
 
       {/* Total */}
       <div className="flex items-center justify-between px-[var(--space-2xs)]">
-        <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">Total</span>
-        <span className="mono text-[var(--text-body)] font-[var(--weight-semibold)] text-[var(--color-text)]">
+        <span className="text-[length:var(--text-label)] text-[color:var(--color-text-muted)]">Total</span>
+        <span className="mono text-[length:var(--text-body)] font-[var(--weight-semibold)] text-[color:var(--color-text)]">
           {formatCost(totalCost)}
         </span>
       </div>

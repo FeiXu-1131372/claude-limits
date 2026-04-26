@@ -1,0 +1,113 @@
+<!doctype html>
+<!--
+  Self-critique demo page. Stubs the Tauri runtime APIs with mock data so the
+  React popover renders in a regular browser at localhost:1420/popover-demo.html
+  without needing the native Tauri webview. Used only for visual review;
+  delete after design iteration.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Popover Demo</title>
+    <script>
+      // Stub Tauri internals BEFORE any module imports run.
+      const fiveHourReset = new Date(Date.now() + 7080 * 1000).toISOString();
+      const sevenDayReset = new Date(Date.now() + (119 * 3600 + 43 * 60) * 1000).toISOString();
+
+      window.__TAURI_INTERNALS__ = {
+        metadata: {
+          currentWindow: { label: 'popover' },
+          currentWebview: { label: 'popover' },
+        },
+        transformCallback: (cb) => {
+          // Tauri uses this to register channel/event callbacks. For the demo
+          // we just return the callback so manual emits are possible.
+          return cb;
+        },
+        invoke: (cmd) => {
+          switch (cmd) {
+            case 'get_settings':
+              return Promise.resolve({
+                polling_interval_secs: 300,
+                thresholds: [75, 90],
+                theme: 'system',
+                launch_at_login: false,
+                crash_reports: false,
+              });
+            case 'has_claude_code_creds':
+              return Promise.resolve(false);
+            case 'get_current_usage':
+              return Promise.resolve({
+                snapshot: {
+                  five_hour: { utilization: 11, resets_at: fiveHourReset },
+                  seven_day: { utilization: 16, resets_at: sevenDayReset },
+                  seven_day_sonnet: { utilization: 2, resets_at: sevenDayReset },
+                  seven_day_opus: null,
+                  extra_usage: { is_enabled: true, utilization: 97, resets_at: null },
+                  fetched_at: new Date(Date.now() - 30 * 1000).toISOString(),
+                },
+                account_id: 'demo',
+                account_email: 'demo@example.com',
+                last_error: null,
+              });
+            case 'force_refresh':
+              return Promise.resolve();
+            default:
+              return Promise.resolve(null);
+          }
+        },
+      };
+
+      // Stub the event listener API used by lib/events.ts.
+      const _listeners = new Map();
+      window.__TAURI_INTERNALS__.invoke = window.__TAURI_INTERNALS__.invoke.bind(window.__TAURI_INTERNALS__);
+
+      // Provide a minimal stub for the @tauri-apps/api/event listen() function.
+      // listen() resolves to an unlisten function. We just no-op.
+      window.__TAURI__ = {
+        event: {
+          listen: (_event, _cb) => Promise.resolve(() => {}),
+        },
+      };
+    </script>
+    <style>
+      /* Paint a soft desktop-y background so vibrancy + warm wash on the
+       * popover have something to read against (similar to what the user
+       * sees in the menubar over their wallpaper). */
+      html, body {
+        margin: 0;
+        height: 100%;
+        background:
+          radial-gradient(at 20% 30%, oklch(70% 0.10 60), transparent 60%),
+          radial-gradient(at 80% 70%, oklch(60% 0.13 220), transparent 60%),
+          oklch(40% 0.05 60);
+      }
+      .demo-frame {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+      }
+      .demo-popover {
+        width: var(--popover-width, 360px);
+        height: var(--popover-height, 360px);
+        border-radius: 14px;
+        overflow: hidden;
+        background: oklch(20% 0.012 65 / 0.78);
+        backdrop-filter: blur(40px) saturate(1.4);
+        -webkit-backdrop-filter: blur(40px) saturate(1.4);
+        border: 1px solid oklch(95% 0.02 65 / 0.08);
+        box-shadow: 0 16px 40px -8px oklch(0% 0 0 / 0.45);
+      }
+    </style>
+  </head>
+  <body data-window="popover">
+    <div class="demo-frame">
+      <div class="demo-popover">
+        <div id="root"></div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

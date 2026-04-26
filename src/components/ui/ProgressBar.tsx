@@ -34,9 +34,9 @@ const gradientMap: Record<ThresholdLevel, string> = {
 };
 
 const colorMap: Record<ThresholdLevel, string> = {
-  safe: 'text-[var(--color-safe)]',
-  warn: 'text-[var(--color-warn)]',
-  danger: 'text-[var(--color-danger)]',
+  safe: 'text-[color:var(--color-safe)]',
+  warn: 'text-[color:var(--color-warn)]',
+  danger: 'text-[color:var(--color-danger)]',
 };
 
 export const ProgressBar = forwardRef<HTMLDivElement, ProgressBarProps>(
@@ -87,7 +87,7 @@ export const ProgressBar = forwardRef<HTMLDivElement, ProgressBarProps>(
         {showLabel && (
           <span
             className={[
-              'mono text-[var(--text-title)] font-[var(--weight-semibold)] tabular-nums min-w-[44px] text-right',
+              'mono text-[length:var(--text-title)] font-[var(--weight-semibold)] tabular-nums min-w-[44px] text-right',
               colorMap[level],
             ].join(' ')}
           >

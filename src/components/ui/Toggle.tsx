@@ -19,11 +19,11 @@ export const Toggle = forwardRef<HTMLInputElement, ToggleProps>(
         ].join(' ')}
       >
         <div className="flex flex-col gap-[2px]">
-          <span className="text-[var(--text-body)] font-[var(--weight-medium)] text-[var(--color-text)]">
+          <span className="text-[length:var(--text-body)] font-[var(--weight-medium)] text-[color:var(--color-text)]">
             {label}
           </span>
           {description && (
-            <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">
+            <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
               {description}
             </span>
           )}

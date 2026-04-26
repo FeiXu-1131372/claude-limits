@@ -20,7 +20,7 @@ export function ProjectsTab() {
     );
   }
   if (loading || !data) {
-    return <p className="text-[var(--color-text-muted)]">Loading…</p>;
+    return <p className="text-[color:var(--color-text-muted)]">Loading…</p>;
   }
 
   if (data.length === 0) {
@@ -45,14 +45,14 @@ export function ProjectsTab() {
             <div className="flex flex-col gap-[var(--space-sm)]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-[var(--space-sm)]">
-                  <span className="text-[var(--text-body)] font-[var(--weight-medium)] text-[var(--color-text)]">
+                  <span className="text-[length:var(--text-body)] font-[var(--weight-medium)] text-[color:var(--color-text)]">
                     {project.project}
                   </span>
-                  <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">
+                  <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
                     {project.session_count} sessions
                   </span>
                 </div>
-                <span className="mono text-[var(--text-label)] font-[var(--weight-semibold)] text-[var(--color-text)] tabular-nums">
+                <span className="mono text-[length:var(--text-label)] font-[var(--weight-semibold)] text-[color:var(--color-text)] tabular-nums">
                   {formatCost(project.total_cost_usd)}
                 </span>
               </div>

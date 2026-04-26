@@ -33,9 +33,9 @@ const gradientMap: Record<ThresholdLevel, string> = {
 };
 
 const textColorMap: Record<ThresholdLevel, string> = {
-  safe: 'text-[var(--color-text)]',
-  warn: 'text-[var(--color-warn)]',
-  danger: 'text-[var(--color-danger)]',
+  safe: 'text-[color:var(--color-text)]',
+  warn: 'text-[color:var(--color-warn)]',
+  danger: 'text-[color:var(--color-danger)]',
 };
 
 export const UsageBar = forwardRef<HTMLDivElement, UsageBarProps>(
@@ -61,8 +61,8 @@ export const UsageBar = forwardRef<HTMLDivElement, UsageBarProps>(
     if (!data && valueProp === undefined) {
       return (
         <div className={['flex items-center justify-between py-2', className].join(' ')} {...props}>
-          <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">{label}</span>
-          <span className="mono text-[var(--text-label)] text-[var(--color-text-muted)] opacity-60">n/a</span>
+          <span className="text-[length:var(--text-label)] text-[color:var(--color-text-muted)]">{label}</span>
+          <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-muted)] opacity-60">n/a</span>
         </div>
       );
     }
@@ -71,20 +71,20 @@ export const UsageBar = forwardRef<HTMLDivElement, UsageBarProps>(
     // reset countdown — repeating it inside a narrow grid cell makes the
     // timer wrap onto a second line and collide with the percentage.
     const showTimer = size !== 'sm';
-    const pctSize = size === 'sm' ? 'text-[var(--text-title)]' : 'text-[var(--text-pct)]';
+    const pctSize = size === 'sm' ? 'text-[length:var(--text-title)]' : 'text-[length:var(--text-pct)]';
 
     return (
       <div ref={ref} className={['flex flex-col gap-[6px]', className].join(' ')} {...props}>
         <div className="flex items-center justify-between gap-[var(--space-sm)]">
           <div className="flex items-baseline gap-[var(--space-sm)] min-w-0">
-            <span className="text-[var(--text-label)] font-[var(--weight-medium)] text-[var(--color-text-secondary)] shrink-0">
+            <span className="text-[length:var(--text-label)] font-[var(--weight-medium)] text-[color:var(--color-text-secondary)] shrink-0">
               {label}
             </span>
             {showTimer && data?.resets_at && (
               <ResetCountdown resetsAt={data.resets_at} />
             )}
             {showTimer && timerProp && !data?.resets_at && (
-              <span className="mono text-[var(--text-micro)] text-[var(--color-text-muted)] truncate">
+              <span className="mono text-[length:var(--text-micro)] text-[color:var(--color-text-muted)] truncate">
                 {timerProp}
               </span>
             )}

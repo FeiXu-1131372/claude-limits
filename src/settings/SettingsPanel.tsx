@@ -25,7 +25,7 @@ export function SettingsPanel() {
 
   useEffect(() => setLocal(settings), [settings]);
 
-  if (!local) return <p className="text-[var(--color-text-muted)]">Loading...</p>;
+  if (!local) return <p className="text-[color:var(--color-text-muted)]">Loading...</p>;
 
   const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
   const pollingMinutes = Math.max(1, Math.round(local.polling_interval_secs / 60));
@@ -75,7 +75,7 @@ export function SettingsPanel() {
     <div className="flex flex-col gap-[var(--space-lg)] h-full overflow-y-auto">
       {/* General */}
       <section className="flex flex-col gap-[var(--space-sm)]">
-        <h2 className="text-[var(--text-label)] font-[var(--weight-semibold)] text-[var(--color-text-muted)] uppercase tracking-[0.04em] px-[var(--space-2xs)]">
+        <h2 className="text-[length:var(--text-label)] font-[var(--weight-semibold)] text-[color:var(--color-text-muted)] uppercase tracking-[0.04em] px-[var(--space-2xs)]">
           General
         </h2>
         <Card className="p-[var(--space-md)] flex flex-col">
@@ -100,7 +100,7 @@ export function SettingsPanel() {
 
       {/* Polling */}
       <section className="flex flex-col gap-[var(--space-sm)]">
-        <h2 className="text-[var(--text-label)] font-[var(--weight-semibold)] text-[var(--color-text-muted)] uppercase tracking-[0.04em] px-[var(--space-2xs)]">
+        <h2 className="text-[length:var(--text-label)] font-[var(--weight-semibold)] text-[color:var(--color-text-muted)] uppercase tracking-[0.04em] px-[var(--space-2xs)]">
           Polling
         </h2>
         <Card className="p-[var(--space-md)]">
@@ -114,7 +114,7 @@ export function SettingsPanel() {
             formatValue={(v) => `${v}m`}
           />
           {pollingMinutes <= 2 && (
-            <p className="text-[var(--text-micro)] text-[var(--color-warn)] mt-[var(--space-xs)]">
+            <p className="text-[length:var(--text-micro)] text-[color:var(--color-warn)] mt-[var(--space-xs)]">
               Frequent polling may cause rate limiting
             </p>
           )}
@@ -123,7 +123,7 @@ export function SettingsPanel() {
 
       {/* Thresholds */}
       <section className="flex flex-col gap-[var(--space-sm)]">
-        <h2 className="text-[var(--text-label)] font-[var(--weight-semibold)] text-[var(--color-text-muted)] uppercase tracking-[0.04em] px-[var(--space-2xs)]">
+        <h2 className="text-[length:var(--text-label)] font-[var(--weight-semibold)] text-[color:var(--color-text-muted)] uppercase tracking-[0.04em] px-[var(--space-2xs)]">
           Notifications
         </h2>
         <Card className="p-[var(--space-md)] flex flex-col gap-[var(--space-md)]">
@@ -145,7 +145,7 @@ export function SettingsPanel() {
             />
           ))}
           <div className="flex items-center gap-[var(--space-sm)] px-[var(--space-2xs)]">
-            <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">
+            <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
               Notifications fire once per bucket reset cycle
             </span>
           </div>
@@ -154,19 +154,19 @@ export function SettingsPanel() {
 
       {/* Account */}
       <section className="flex flex-col gap-[var(--space-sm)]">
-        <h2 className="text-[var(--text-label)] font-[var(--weight-semibold)] text-[var(--color-text-muted)] uppercase tracking-[0.04em] px-[var(--space-2xs)]">
+        <h2 className="text-[length:var(--text-label)] font-[var(--weight-semibold)] text-[color:var(--color-text-muted)] uppercase tracking-[0.04em] px-[var(--space-2xs)]">
           Account
         </h2>
         <Card className="p-[var(--space-md)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-[var(--space-sm)]">
-              <span className="text-[var(--text-body)] text-[var(--color-text)]">
+              <span className="text-[length:var(--text-body)] text-[color:var(--color-text)]">
                 {accountStatus.connected ? (accountStatus.email ?? 'Connected') : 'Not signed in'}
               </span>
               {accountStatus.source && <Badge variant="live">{accountStatus.source}</Badge>}
             </div>
             {accountStatus.connected && (
-              <Button variant="ghost" size="sm" className="text-[var(--color-danger)]" onClick={signOut}>
+              <Button variant="ghost" size="sm" className="text-[color:var(--color-danger)]" onClick={signOut}>
                 <LogOut size={12} />
                 Sign out
               </Button>
@@ -178,7 +178,7 @@ export function SettingsPanel() {
       {/* Save */}
       <div className="flex flex-col gap-[var(--space-xs)] px-[var(--space-2xs)]">
         {saveError && (
-          <span className="text-[var(--text-micro)] text-[var(--color-danger)]">{saveError}</span>
+          <span className="text-[length:var(--text-micro)] text-[color:var(--color-danger)]">{saveError}</span>
         )}
         <div className="flex justify-end">
           <Button variant="primary" onClick={save} disabled={saving}>

@@ -10,16 +10,16 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    'bg-[var(--color-accent)] text-[var(--color-bg-base)] hover:brightness-110 active:brightness-95',
+    'bg-[var(--color-accent)] text-[color:var(--color-bg-base)] hover:brightness-110 active:brightness-95',
   ghost:
-    'bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-card)] hover:text-[var(--color-text)]',
+    'bg-transparent text-[color:var(--color-text-secondary)] hover:bg-[var(--color-bg-card)] hover:text-[color:var(--color-text)]',
   destructive:
     'bg-[var(--color-danger)] text-white hover:brightness-110 active:brightness-95',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'px-[var(--space-sm)] py-[var(--space-2xs)] text-[var(--text-label)] rounded-[var(--radius-sm)]',
-  md: 'px-[var(--space-md)] py-[var(--space-xs)] text-[var(--text-body)] rounded-[var(--radius-sm)]',
+  sm: 'px-[var(--space-sm)] py-[var(--space-2xs)] text-[length:var(--text-label)] rounded-[var(--radius-sm)]',
+  md: 'px-[var(--space-md)] py-[var(--space-xs)] text-[length:var(--text-body)] rounded-[var(--radius-sm)]',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(

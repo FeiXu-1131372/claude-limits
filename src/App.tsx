@@ -31,7 +31,7 @@ export function App() {
   if (!initialized) {
     return (
       <div className="flex h-full w-full items-center justify-center p-6">
-        <span className="text-[var(--color-text-muted)]">Loading…</span>
+        <span className="text-[color:var(--color-text-muted)]">Loading…</span>
       </div>
     );
   }

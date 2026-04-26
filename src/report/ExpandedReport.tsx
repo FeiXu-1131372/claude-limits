@@ -68,10 +68,10 @@ export function ExpandedReport() {
         "
       >
         <div className="flex items-baseline gap-[var(--space-md)]">
-          <span className="text-[var(--text-title)] font-[var(--weight-semibold)] tracking-[-0.01em] text-[var(--color-text)]">
+          <span className="text-[length:var(--text-title)] font-[var(--weight-semibold)] tracking-[-0.01em] text-[color:var(--color-text)]">
             Claude Usage
           </span>
-          <span className="text-[var(--text-label)] tracking-[var(--tracking-label)] uppercase text-[var(--color-text-muted)]">
+          <span className="text-[length:var(--text-label)] tracking-[var(--tracking-label)] uppercase text-[color:var(--color-text-muted)]">
             {stale ? 'Stale' : 'Live'} · last 30 days
           </span>
         </div>
@@ -168,13 +168,13 @@ function TabBar({
             className={[
               'relative inline-flex items-center',
               'h-[44px]',
-              'text-[var(--text-label)] font-[var(--weight-medium)]',
+              'text-[length:var(--text-label)] font-[var(--weight-medium)]',
               'tracking-[var(--tracking-label)] uppercase',
               'transition-colors duration-[var(--duration-fast)] ease-[var(--ease-out)]',
               'cursor-default',
               active
-                ? 'text-[var(--color-text)]'
-                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]',
+                ? 'text-[color:var(--color-text)]'
+                : 'text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text-secondary)]',
               'focus-visible:outline-2 focus-visible:outline-[var(--color-border-focus)] focus-visible:outline-offset-2 rounded',
             ].join(' ')}
           >

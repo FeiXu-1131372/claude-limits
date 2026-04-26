@@ -49,7 +49,7 @@ export function SessionsTab() {
     );
   }
   if (loading || !events) {
-    return <p className="text-[var(--color-text-muted)]">Loading…</p>;
+    return <p className="text-[color:var(--color-text-muted)]">Loading…</p>;
   }
 
   if (events.length === 0) {
@@ -65,10 +65,10 @@ export function SessionsTab() {
   return (
     <div className="flex flex-col gap-[var(--space-sm)]">
       <div className="flex items-center justify-between px-[var(--space-2xs)]">
-        <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">
+        <span className="text-[length:var(--text-label)] text-[color:var(--color-text-muted)]">
           {events.length} sessions
         </span>
-        <span className="mono text-[var(--text-label)] text-[var(--color-text-secondary)]">
+        <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-secondary)]">
           {formatCost(totalCost)}
         </span>
       </div>
@@ -90,23 +90,23 @@ export function SessionsTab() {
             >
               <div className="flex flex-col min-w-0 flex-1">
                 <div className="flex items-center gap-[var(--space-sm)]">
-                  <span className="text-[var(--text-body)] text-[var(--color-text)] truncate">
+                  <span className="text-[length:var(--text-body)] text-[color:var(--color-text)] truncate">
                     {session.project}
                   </span>
                   <Badge variant={MODEL_BADGE[key] ?? 'default'}>
                     {key}
                   </Badge>
                 </div>
-                <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">
+                <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
                   {formatTime(session.ts)}
                 </span>
               </div>
 
               <div className="flex items-center gap-[var(--space-md)] shrink-0">
-                <span className="mono text-[var(--text-label)] text-[var(--color-text-secondary)] tabular-nums">
+                <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-secondary)] tabular-nums">
                   {formatTokens(total)}
                 </span>
-                <span className="mono text-[var(--text-label)] text-[var(--color-text-muted)] tabular-nums min-w-[48px] text-right">
+                <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-muted)] tabular-nums min-w-[48px] text-right">
                   {formatCost(session.cost_usd)}
                 </span>
               </div>

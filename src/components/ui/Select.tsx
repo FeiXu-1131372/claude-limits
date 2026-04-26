@@ -18,7 +18,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       <div className={['flex flex-col gap-[var(--space-2xs)]', className].join(' ')}>
         <label
           htmlFor={id}
-          className="text-[var(--text-label)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+          className="text-[length:var(--text-label)] font-[var(--weight-medium)] text-[color:var(--color-text-secondary)]"
         >
           {label}
         </label>
@@ -31,7 +31,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               'bg-[var(--color-bg-card)] border border-[var(--color-border)]',
               'rounded-[var(--radius-sm)]',
               'px-[var(--space-sm)] py-[var(--space-xs)]',
-              'text-[var(--text-body)] text-[var(--color-text)]',
+              'text-[length:var(--text-body)] text-[color:var(--color-text)]',
               'outline-none',
               'transition-[border-color] duration-[var(--duration-fast)]',
               'hover:border-[var(--color-border-hover)]',
@@ -46,7 +46,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               </option>
             ))}
           </select>
-          <div className="pointer-events-none absolute right-[var(--space-sm)] top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]">
+          <div className="pointer-events-none absolute right-[var(--space-sm)] top-1/2 -translate-y-1/2 text-[color:var(--color-text-muted)]">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="m6 9 6 6 6-6" />
             </svg>

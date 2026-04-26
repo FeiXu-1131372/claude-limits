@@ -68,7 +68,7 @@ export function CompactPopover() {
           onSettings={() => setView('settings')}
         />
         <div className="flex flex-1 items-center justify-center">
-          <span className="text-[var(--text-label)] text-[var(--color-text-muted)]">
+          <span className="text-[length:var(--text-label)] text-[color:var(--color-text-muted)]">
             Loading…
           </span>
         </div>
@@ -157,9 +157,14 @@ export function CompactPopover() {
         </>
       )}
 
-      {/* Footer: timestamp + ghost link to expanded report */}
-      <div className="mt-auto flex items-center justify-between px-[var(--popover-pad)] py-[var(--space-sm)] border-t border-[var(--color-rule)]">
-        <span className="text-[var(--text-micro)] text-[var(--color-text-muted)]">
+      {/* Footer: timestamp + ghost link to expanded report. Explicit inline
+       * marginTop: auto because Tailwind's `mt-auto` utility wasn't being
+       * picked up here — this is more robust than depending on JIT. */}
+      <div
+        style={{ marginTop: 'auto' }}
+        className="flex items-center justify-between px-[var(--popover-pad)] py-[var(--space-sm)] border-t border-[var(--color-rule)]"
+      >
+        <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
           Updated {updatedAgo || '—'}
         </span>
         <button
@@ -167,9 +172,9 @@ export function CompactPopover() {
           onClick={() => ipc.openExpandedWindow()}
           className="
             group inline-flex items-center gap-[2px]
-            text-[var(--text-label)] text-[var(--color-text-secondary)]
+            text-[length:var(--text-label)] text-[color:var(--color-text-secondary)]
             transition-colors duration-[var(--duration-fast)] ease-[var(--ease-out)]
-            hover:text-[var(--color-text)]
+            hover:text-[color:var(--color-text)]
             focus-visible:outline-2 focus-visible:outline-[var(--color-border-focus)] focus-visible:outline-offset-2 rounded
           "
         >
@@ -221,7 +226,7 @@ function ChromeBar({
       className="flex items-center justify-between gap-[var(--space-sm)] px-[var(--popover-pad)] pt-[var(--space-md)] pb-[var(--space-sm)] cursor-default select-none"
     >
       <div data-tauri-drag-region className="flex items-center gap-[var(--space-xs)]">
-        <span className="text-[var(--text-label)] font-[var(--weight-semibold)] text-[var(--color-text-secondary)] tracking-[var(--tracking-label)] uppercase">
+        <span className="text-[length:var(--text-label)] font-[var(--weight-semibold)] text-[color:var(--color-text-secondary)] tracking-[var(--tracking-label)] uppercase">
           Claude
         </span>
         <StatusDot live={live} stale={stale} />
@@ -259,16 +264,16 @@ function Header({ title, onBack }: { title: string; onBack: () => void }) {
         onClick={onBack}
         className="
           inline-flex items-center gap-[var(--space-2xs)]
-          text-[var(--text-label)] text-[var(--color-text-secondary)] tracking-[var(--tracking-label)] uppercase
+          text-[length:var(--text-label)] text-[color:var(--color-text-secondary)] tracking-[var(--tracking-label)] uppercase
           transition-colors duration-[var(--duration-fast)]
-          hover:text-[var(--color-text)]
+          hover:text-[color:var(--color-text)]
           focus-visible:outline-2 focus-visible:outline-[var(--color-border-focus)] focus-visible:outline-offset-2 rounded
         "
       >
         <ChevronRight size={11} className="rotate-180" />
         Back
       </button>
-      <span className="text-[var(--text-label)] font-[var(--weight-semibold)] text-[var(--color-text-secondary)] tracking-[var(--tracking-label)] uppercase">
+      <span className="text-[length:var(--text-label)] font-[var(--weight-semibold)] text-[color:var(--color-text-secondary)] tracking-[var(--tracking-label)] uppercase">
         {title}
       </span>
       <span className="w-[40px]" /> {/* visual ballast for centering */}

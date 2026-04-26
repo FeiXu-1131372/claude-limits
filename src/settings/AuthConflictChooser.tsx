@@ -17,10 +17,10 @@ export function AuthConflictChooser() {
     <div className="flex items-center justify-center h-full p-[var(--space-2xl)]">
       <Card className="max-w-sm p-[var(--space-lg)]">
         <div className="flex flex-col gap-[var(--space-md)]">
-          <h2 className="text-[var(--text-title)] font-[var(--weight-semibold)] text-[var(--color-text)]">
+          <h2 className="text-[length:var(--text-title)] font-[var(--weight-semibold)] text-[color:var(--color-text)]">
             Two Claude accounts detected
           </h2>
-          <p className="text-[var(--text-label)] text-[var(--color-text-muted)]">
+          <p className="text-[length:var(--text-label)] text-[color:var(--color-text-muted)]">
             Which one should this app monitor?
           </p>
           <div className="flex flex-col gap-[var(--space-sm)]">
