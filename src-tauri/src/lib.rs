@@ -131,6 +131,16 @@ pub fn run() {
             let handle = app.handle().clone();
             let state: Arc<AppState> = app.state::<Arc<AppState>>().inner().clone();
 
+            // Make this a menubar-only app on macOS — no Dock icon, no app
+            // switcher entry. Without this, NSStatusItem can fail to register
+            // visibly (the icon ends up at an off-screen position macOS picks
+            // for "regular" apps). With Accessory policy, the tray icon is
+            // the app's only UI surface and macOS places it correctly.
+            #[cfg(target_os = "macos")]
+            {
+                let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            }
+
             // Force the popover to its configured fixed size on every launch.
             // The window-state denylist already keeps it untracked, but a
             // historical save from a previous build can still leave it
