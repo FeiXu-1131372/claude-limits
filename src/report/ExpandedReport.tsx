@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Badge } from '../components/ui/Badge';
 import { IconButton } from '../components/ui/IconButton';
 import { SessionsTab } from './SessionsTab';
 import { ModelsTab } from './ModelsTab';
@@ -11,23 +10,15 @@ import { CacheTab } from './CacheTab';
 import { useAppStore } from '../lib/store';
 import { ipc } from '../lib/ipc';
 import { tabSlide } from '../lib/motion';
-import {
-  IconSessions,
-  IconChart,
-  IconTrends,
-  IconPolling,
-  IconHeatmap,
-  IconCache,
-  IconRefresh,
-} from '../lib/icons';
+import { IconRefresh } from '../lib/icons';
 
 const TAB_CONFIG = [
-  { id: 'sessions', label: 'Sessions', icon: IconSessions },
-  { id: 'models', label: 'Models', icon: IconChart },
-  { id: 'trends', label: 'Trends', icon: IconTrends },
-  { id: 'projects', label: 'Projects', icon: IconPolling },
-  { id: 'heatmap', label: 'Heatmap', icon: IconHeatmap },
-  { id: 'cache', label: 'Cache', icon: IconCache },
+  { id: 'sessions', label: 'Sessions' },
+  { id: 'models', label: 'Models' },
+  { id: 'trends', label: 'Trends' },
+  { id: 'projects', label: 'Projects' },
+  { id: 'heatmap', label: 'Heatmap' },
+  { id: 'cache', label: 'Cache' },
 ] as const;
 
 const TAB_COMPONENTS: Record<string, React.FC> = {
@@ -40,7 +31,7 @@ const TAB_COMPONENTS: Record<string, React.FC> = {
 };
 
 export function ExpandedReport() {
-  const [activeTab, setActiveTab] = useState('sessions');
+  const [activeTab, setActiveTab] = useState<string>('sessions');
   const [refreshing, setRefreshing] = useState(false);
   const [tabKey, setTabKey] = useState(0);
   const stale = useAppStore((s) => s.stale);
@@ -52,78 +43,62 @@ export function ExpandedReport() {
     setRefreshing(true);
     try {
       await ipc.forceRefresh();
-      // Bump the tab key so the active tab remounts and re-fetches its data.
       setTabKey((k) => k + 1);
     } finally {
-      setTimeout(() => setRefreshing(false), 400);
+      setTimeout(() => setRefreshing(false), 420);
     }
   }
 
   return (
     <div
-      className="flex flex-col h-full bg-[var(--color-bg-surface)] rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] overflow-hidden"
+      className="flex h-full flex-col overflow-hidden border border-[var(--color-border-subtle)]"
       style={{
         width: 'var(--report-width)',
         minHeight: 'var(--report-min-height)',
+        background: 'var(--color-bg-base)',
+        borderRadius: 'var(--radius-lg)',
       }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-[var(--space-lg)] py-[var(--space-md)] border-b border-[var(--color-border-subtle)] shrink-0">
-        <div className="flex items-center gap-[var(--space-sm)]">
-          <span className="text-[var(--text-body)] font-[var(--weight-semibold)] text-[var(--color-text)]">
-            Claude Usage Report
+      {/* Header — generous padding, brand-warm tinted strip with hairline below */}
+      <header
+        className="
+          relative flex items-center justify-between gap-[var(--space-md)]
+          px-[var(--space-2xl)] pt-[var(--space-xl)] pb-[var(--space-lg)]
+          shrink-0
+        "
+      >
+        <div className="flex items-baseline gap-[var(--space-md)]">
+          <span className="text-[var(--text-title)] font-[var(--weight-semibold)] tracking-[-0.01em] text-[var(--color-text)]">
+            Claude Usage
           </span>
-          <Badge variant={stale ? 'stale' : 'live'}>
-            {stale ? 'Stale' : 'Live'}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-[var(--space-sm)]">
-          <span className="mono text-[var(--text-label)] text-[var(--color-text-muted)]">
-            Last 30 days
+          <span className="text-[var(--text-label)] tracking-[var(--tracking-label)] uppercase text-[var(--color-text-muted)]">
+            {stale ? 'Stale' : 'Live'} · last 30 days
           </span>
-          <IconButton label="Refresh" onClick={handleRefresh}>
-            <motion.span
-              animate={refreshing ? { rotate: 360 } : { rotate: 0 }}
-              transition={refreshing ? { duration: 0.7, ease: 'linear', repeat: Infinity } : { duration: 0.2 }}
-              style={{ display: 'inline-flex' }}
-            >
-              <IconRefresh size={14} />
-            </motion.span>
-          </IconButton>
         </div>
-      </div>
+        <IconButton label="Refresh" onClick={handleRefresh}>
+          <motion.span
+            animate={refreshing ? { rotate: 360 } : { rotate: 0 }}
+            transition={
+              refreshing
+                ? { duration: 0.7, ease: 'linear', repeat: Infinity }
+                : { duration: 0.2 }
+            }
+            style={{ display: 'inline-flex' }}
+          >
+            <IconRefresh size={14} />
+          </motion.span>
+        </IconButton>
+      </header>
 
-      {/* Tab bar */}
-      <div className="px-[var(--space-lg)] pt-[var(--space-md)] shrink-0">
-        <div className="flex gap-[var(--space-2xs)] p-[var(--space-2xs)] bg-[var(--color-track)] rounded-[var(--radius-md)]">
-          {TAB_CONFIG.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={[
-                  'flex items-center gap-[var(--space-2xs)]',
-                  'px-[var(--space-sm)] py-[var(--space-xs)]',
-                  'text-[var(--text-label)] font-[var(--weight-medium)]',
-                  'rounded-[var(--radius-sm)] select-none whitespace-nowrap',
-                  'transition-[background,color] duration-[var(--duration-fast)] ease-[var(--ease-out)]',
-                  isActive
-                    ? 'bg-[var(--color-bg-card)] text-[var(--color-text)]'
-                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]',
-                  'focus-visible:outline-2 focus-visible:outline-[var(--color-border-focus)] focus-visible:outline-offset-1',
-                ].join(' ')}
-              >
-                <tab.icon size={12} />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* Tab bar — text-only, with a single sliding underline indicator */}
+      <TabBar
+        activeId={activeTab}
+        onSelect={setActiveTab}
+        tabs={TAB_CONFIG.map((t) => ({ id: t.id, label: t.label }))}
+      />
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto px-[var(--space-lg)] pb-[var(--space-lg)]">
+      <div className="flex-1 overflow-y-auto px-[var(--space-2xl)] pb-[var(--space-2xl)] pt-[var(--space-lg)]">
         <motion.div
           key={`${activeTab}-${tabKey}`}
           variants={tabSlide}
@@ -131,11 +106,91 @@ export function ExpandedReport() {
           animate="center"
           exit="exit"
           custom={1}
-          className="pt-[var(--space-md)]"
         >
           <TabComponent />
         </motion.div>
       </div>
+    </div>
+  );
+}
+
+/* ───────────────────────── TabBar ─────────────────────────
+ *
+ * Horizontal text nav with one moving underline that slides between tabs
+ * (Apple's site nav, Linear's view switcher). Layout-tracked via refs so the
+ * underline matches the actual rendered button width — no manual measuring.
+ */
+function TabBar({
+  activeId,
+  onSelect,
+  tabs,
+}: {
+  activeId: string;
+  onSelect: (id: string) => void;
+  tabs: { id: string; label: string }[];
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [indicator, setIndicator] = useState({ x: 0, w: 0 });
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const btn = buttonRefs.current[activeId];
+    if (!container || !btn) return;
+    const cRect = container.getBoundingClientRect();
+    const bRect = btn.getBoundingClientRect();
+    setIndicator({ x: bRect.left - cRect.left, w: bRect.width });
+  }, [activeId, tabs.length]);
+
+  return (
+    <div
+      ref={containerRef}
+      role="tablist"
+      className="
+        relative flex items-center gap-[var(--space-xl)]
+        px-[var(--space-2xl)]
+        border-b border-[var(--color-rule)]
+        shrink-0
+      "
+    >
+      {tabs.map((tab) => {
+        const active = activeId === tab.id;
+        return (
+          <button
+            key={tab.id}
+            ref={(el) => {
+              buttonRefs.current[tab.id] = el;
+            }}
+            role="tab"
+            aria-selected={active}
+            type="button"
+            onClick={() => onSelect(tab.id)}
+            className={[
+              'relative inline-flex items-center',
+              'h-[44px]',
+              'text-[var(--text-label)] font-[var(--weight-medium)]',
+              'tracking-[var(--tracking-label)] uppercase',
+              'transition-colors duration-[var(--duration-fast)] ease-[var(--ease-out)]',
+              'cursor-default',
+              active
+                ? 'text-[var(--color-text)]'
+                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]',
+              'focus-visible:outline-2 focus-visible:outline-[var(--color-border-focus)] focus-visible:outline-offset-2 rounded',
+            ].join(' ')}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
+      {/* Sliding underline */}
+      <motion.span
+        aria-hidden
+        className="absolute bottom-0 h-[2px] rounded-full"
+        style={{ background: 'var(--color-accent)' }}
+        initial={false}
+        animate={{ x: indicator.x, width: indicator.w }}
+        transition={{ type: 'spring', stiffness: 380, damping: 32, mass: 0.7 }}
+      />
     </div>
   );
 }

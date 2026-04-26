@@ -2,7 +2,7 @@ use crate::app_state::{AppState, CachedUsage};
 use crate::auth::AuthError;
 use crate::notifier;
 use crate::tray;
-use crate::usage_api::{next_backoff, FetchOutcome, UsageSnapshot};
+use crate::usage_api::{next_backoff, FetchOutcome};
 use chrono::Utc;
 use serde_json::json;
 use std::sync::Arc;
@@ -61,14 +61,18 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
     let (token, _source, account) = match state.auth.get_access_token().await {
         Ok(t) => t,
         Err(AuthError::NoSource) => {
-            tray::set_level(handle, None, true);
+            tray::set_level(handle, None, None, true);
+            // Brand-new install with no creds at all — surface the auth panel
+            // explicitly. Without this the popover would just hang on "Loading…"
+            // forever because no signal ever tells it that sign-in is required.
+            let _ = handle.emit("auth_required", ());
             return PollResult::Transient;
         }
         Err(AuthError::Conflict {
             oauth_email,
             cli_email,
         }) => {
-            tray::set_level(handle, None, true);
+            tray::set_level(handle, None, None, true);
             let _ = handle.emit(
                 "auth_source_conflict",
                 json!({
@@ -80,7 +84,7 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
         }
         Err(e) => {
             tracing::warn!("auth failure: {e}");
-            tray::set_level(handle, None, true);
+            tray::set_level(handle, None, None, true);
             let _ = handle.emit("auth_required", ());
             return PollResult::Transient;
         }
@@ -96,7 +100,12 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
             };
             *state.cached_usage.write() = Some(cached.clone());
             let _ = handle.emit("usage_updated", &cached);
-            tray::set_level(handle, worst_utilization(&snapshot), false);
+            tray::set_level(
+                handle,
+                snapshot.five_hour.as_ref().map(|u| u.utilization),
+                snapshot.seven_day.as_ref().map(|u| u.utilization),
+                false,
+            );
 
             let thresholds = state.settings.read().thresholds.clone();
             match notifier::evaluate(
@@ -122,7 +131,7 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
             PollResult::Ok
         }
         FetchOutcome::Unauthorized => {
-            tray::set_level(handle, None, true);
+            tray::set_level(handle, None, None, true);
             let _ = handle.emit("auth_required", ());
             PollResult::Transient
         }
@@ -139,15 +148,3 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
     }
 }
 
-fn worst_utilization(s: &UsageSnapshot) -> Option<f64> {
-    [
-        s.five_hour.as_ref().map(|u| u.utilization),
-        s.seven_day.as_ref().map(|u| u.utilization),
-        s.seven_day_opus.as_ref().map(|u| u.utilization),
-        s.seven_day_sonnet.as_ref().map(|u| u.utilization),
-        s.extra_usage.as_ref().map(|u| u.utilization),
-    ]
-    .into_iter()
-    .flatten()
-    .fold(None, |acc: Option<f64>, x| Some(acc.map_or(x, |a| a.max(x))))
-}

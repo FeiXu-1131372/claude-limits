@@ -10,7 +10,6 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
     <button
       ref={ref}
       aria-label={label}
-      title={label}
       className={[
         'w-[30px] h-[30px] inline-flex items-center justify-center',
         'rounded-[var(--radius-sm)]',

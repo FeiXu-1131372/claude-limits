@@ -109,12 +109,44 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(
+            // Track the report window's size/position/maximized so users keep
+            // their preferred layout, but never restore visibility — the report
+            // must stay hidden on cold start and only appear when the user
+            // clicks "See details". The popover is a fixed 360×360 widget,
+            // so don't track it at all.
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::SIZE
+                        | tauri_plugin_window_state::StateFlags::POSITION
+                        | tauri_plugin_window_state::StateFlags::MAXIMIZED
+                        | tauri_plugin_window_state::StateFlags::DECORATIONS,
+                )
+                .with_denylist(&["popover"])
+                .build(),
+        )
         .invoke_handler(specta_builder.invoke_handler())
         .setup(|app| {
             use tauri::Manager;
             let handle = app.handle().clone();
             let state: Arc<AppState> = app.state::<Arc<AppState>>().inner().clone();
+
+            // Force the popover to its configured fixed size on every launch.
+            // The window-state denylist already keeps it untracked, but a
+            // historical save from a previous build can still leave it
+            // oversized on first run after the upgrade.
+            if let Some(popover) = app.get_webview_window("popover") {
+                use tauri::{LogicalSize, Size};
+                let _ = popover.set_size(Size::Logical(LogicalSize::new(360.0, 360.0)));
+            }
+
+            // Always start with the report window hidden — the user opens it
+            // explicitly via the tray menu or the "See details" button. This
+            // guards against any plugin / OS path that might otherwise leave
+            // it visible from a previous session.
+            if let Some(report) = app.get_webview_window("report") {
+                let _ = report.hide();
+            }
 
             // Apply native vibrancy to the popover so it reads as a Control
             // Center / Raycast-style menubar widget instead of a flat panel.

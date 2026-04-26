@@ -67,18 +67,24 @@ export const UsageBar = forwardRef<HTMLDivElement, UsageBarProps>(
       );
     }
 
+    // Sub-bars (size='sm') are children of a parent bar that already shows the
+    // reset countdown — repeating it inside a narrow grid cell makes the
+    // timer wrap onto a second line and collide with the percentage.
+    const showTimer = size !== 'sm';
+    const pctSize = size === 'sm' ? 'text-[var(--text-title)]' : 'text-[var(--text-pct)]';
+
     return (
       <div ref={ref} className={['flex flex-col gap-[6px]', className].join(' ')} {...props}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-[var(--space-sm)]">
-            <span className="text-[var(--text-label)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]">
+        <div className="flex items-center justify-between gap-[var(--space-sm)]">
+          <div className="flex items-baseline gap-[var(--space-sm)] min-w-0">
+            <span className="text-[var(--text-label)] font-[var(--weight-medium)] text-[var(--color-text-secondary)] shrink-0">
               {label}
             </span>
-            {data?.resets_at && (
+            {showTimer && data?.resets_at && (
               <ResetCountdown resetsAt={data.resets_at} />
             )}
-            {timerProp && !data?.resets_at && (
-              <span className="mono text-[var(--text-micro)] text-[var(--color-text-muted)]">
+            {showTimer && timerProp && !data?.resets_at && (
+              <span className="mono text-[var(--text-micro)] text-[var(--color-text-muted)] truncate">
                 {timerProp}
               </span>
             )}
@@ -86,7 +92,8 @@ export const UsageBar = forwardRef<HTMLDivElement, UsageBarProps>(
           {showLabel && (
             <span
               className={[
-                'mono text-[var(--text-title)] font-[var(--weight-semibold)] tabular-nums',
+                'mono font-[var(--weight-semibold)] tabular-nums leading-none shrink-0',
+                pctSize,
                 textColorMap[level],
               ].join(' ')}
             >

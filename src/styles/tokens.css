@@ -1,81 +1,101 @@
 /*
  * Claude Usage Monitor — Design Tokens
  *
- * Single source of truth. Every component references these.
- * No hard-coded colors, radii, spacing, or motion values elsewhere.
+ * Aesthetic direction: "Instrument, not dashboard". The popover should read
+ * like a tactile measurement device — Apple Watch complication, fuel gauge,
+ * Linear-style restraint — not a generic admin panel with cards and bars.
  *
- * Theme: system-aware (light / dark via prefers-color-scheme).
- * Palette: Anthropic warm orange/terracotta foundation, teal/cyan accent.
+ * Palette built in OKLCH so that every gray gets a faint terracotta cast
+ * (hue 65°, chroma 0.012). The accent is a single teal; status colors are
+ * warm-shifted (no pure green/red).
+ *
+ * Numbers (and *only* numbers) use JetBrains Mono. Everything else uses the
+ * native system font (SF Pro on macOS, Segoe UI on Windows) so the UI feels
+ * native, not terminal-y.
  */
 
 /* ─── Dark theme (default) ─── */
 
 :root {
-  /* Color — Surfaces */
-  --color-bg-base: #1a1714;
-  --color-bg-surface: rgba(38, 34, 30, 0.72);
-  --color-bg-surface-hover: rgba(48, 43, 38, 0.8);
-  --color-bg-card: rgba(50, 44, 38, 0.45);
-  --color-bg-card-hover: rgba(58, 52, 44, 0.55);
-  --color-bg-elevated: rgba(64, 56, 48, 0.6);
+  color-scheme: dark;
 
-  /* Color — Borders */
-  --color-border: rgba(255, 235, 210, 0.08);
-  --color-border-subtle: rgba(255, 235, 210, 0.05);
-  --color-border-hover: rgba(255, 235, 210, 0.12);
-  --color-border-focus: rgba(45, 212, 191, 0.4);
+  /* Color — Surfaces (warm-tinted neutrals via OKLCH) */
+  --color-bg-base: oklch(20% 0.012 65);
+  --color-bg-surface: oklch(22% 0.014 65 / 0.78);
+  --color-bg-surface-hover: oklch(26% 0.014 65 / 0.88);
+  --color-bg-card: oklch(28% 0.018 65 / 0.55);
+  --color-bg-card-hover: oklch(32% 0.020 65 / 0.65);
+  --color-bg-elevated: oklch(34% 0.022 65 / 0.72);
 
-  /* Color — Text */
-  --color-text: rgba(255, 248, 240, 0.92);
-  --color-text-secondary: rgba(255, 235, 210, 0.55);
-  --color-text-muted: rgba(255, 235, 210, 0.3);
+  /* Color — Borders (warm-bias, very low chroma) */
+  --color-rule: oklch(95% 0.02 65 / 0.08);     /* Hairline dividers */
+  --color-rule-strong: oklch(95% 0.02 65 / 0.16);
+  --color-border: oklch(95% 0.02 65 / 0.14);
+  --color-border-subtle: oklch(95% 0.02 65 / 0.08);
+  --color-border-hover: oklch(95% 0.02 65 / 0.22);
+  --color-border-focus: oklch(72% 0.13 180 / 0.5);
 
-  /* Color — Accent */
-  --color-accent: #2dd4bf;
-  --color-accent-dim: rgba(45, 212, 191, 0.12);
-  --color-accent-muted: rgba(45, 212, 191, 0.25);
+  /* Color — Text (warm whites, never pure) */
+  --color-text: oklch(96% 0.01 65 / 0.94);
+  --color-text-secondary: oklch(80% 0.025 65 / 0.62);
+  --color-text-muted: oklch(70% 0.025 65 / 0.42);
 
-  /* Color — Status */
-  --color-safe: #4ade80;
-  --color-safe-dim: rgba(74, 222, 128, 0.12);
-  --color-warn: #fb923c;
-  --color-warn-dim: rgba(251, 146, 60, 0.12);
-  --color-danger: #f87171;
-  --color-danger-dim: rgba(248, 113, 113, 0.12);
+  /* Color — Accent (teal, single hue, used sparingly) */
+  --color-accent: oklch(72% 0.13 180);
+  --color-accent-dim: oklch(72% 0.13 180 / 0.14);
+  --color-accent-muted: oklch(72% 0.13 180 / 0.28);
+
+  /* Color — Status (warm-biased — coral instead of red, amber instead of yellow) */
+  --color-safe: oklch(76% 0.14 162);
+  --color-safe-dim: oklch(76% 0.14 162 / 0.12);
+  --color-warn: oklch(74% 0.16 55);
+  --color-warn-dim: oklch(74% 0.16 55 / 0.14);
+  --color-danger: oklch(66% 0.20 25);
+  --color-danger-dim: oklch(66% 0.20 25 / 0.14);
 
   /* Color — Utility */
-  --color-track: rgba(255, 235, 210, 0.06);
-  --color-overlay: rgba(10, 8, 6, 0.5);
+  --color-track: oklch(95% 0.02 65 / 0.07);
+  --color-overlay: oklch(10% 0.01 65 / 0.55);
 
-  /* Glass */
+  /* Glass — Subtle warm tint behind vibrancy */
   --glass-blur: 40px;
   --glass-saturate: 1.4;
-  --glass-tint: rgba(251, 146, 60, 0.03);
+  --glass-tint: oklch(72% 0.10 55 / 0.04);
 
-  /* Type — Font families */
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI',
+    system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, 'Cascadia Code',
+    'Fira Code', monospace;
 
-  /* Type — Scale */
-  --text-display: 28px;
-  --text-title: 15px;
+  /* Type — Scale (a 5-step system with strong contrast between steps) */
+  --text-hero: 56px;     /* Two-column percentage (the focal point) */
+  --text-display: 28px;  /* Single-column hero */
+  --text-pct: 24px;      /* Secondary numbers */
+  --text-title: 14px;
   --text-body: 13px;
   --text-label: 11px;
-  --text-micro: 10px;
+  --text-micro: 10.5px;
 
-  /* Type — Line heights */
+  /* Type — Line heights — tighter for big mono numbers */
+  --leading-hero: 0.9;
   --leading-display: 1.1;
   --leading-title: 1.3;
   --leading-body: 1.5;
   --leading-label: 1.4;
   --leading-micro: 1.3;
 
+  /* Type — Letter spacing */
+  --tracking-hero: -0.04em;       /* Big mono digits — tight */
+  --tracking-display: -0.02em;
+  --tracking-label: 0.04em;       /* Uppercase labels — open */
+
   /* Type — Weights */
   --weight-regular: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
 
-  /* Spacing */
+  /* Spacing — generous on horizontal, tighter on vertical */
   --space-2xs: 2px;
   --space-xs: 4px;
   --space-sm: 8px;
@@ -94,29 +114,28 @@
   --radius-lg: 14px;
   --radius-pill: 100px;
 
-  /* Motion — Easings */
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);          /* ease-out-quart */
+  --ease-out-strong: cubic-bezier(0.16, 1, 0.3, 1);    /* ease-out-quint */
   --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
-  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
 
-  /* Motion — Durations */
   --duration-instant: 100ms;
   --duration-fast: 200ms;
-  --duration-normal: 300ms;
-  --duration-slow: 500ms;
-  --duration-bar: 800ms;
+  --duration-normal: 320ms;
+  --duration-slow: 520ms;
+  --duration-bar: 700ms;
 
-  /* Progress bar */
+  /* Progress — hairline by default */
+  --bar-height-hairline: 2px;
   --bar-height-sm: 3px;
-  --bar-height-md: 5px;
-  --bar-height-lg: 8px;
+  --bar-height-md: 4px;
+  --bar-height-lg: 6px;
 
-  /* Popover dimensions */
+  /* Window dimensions */
   --popover-width: 360px;
-  --popover-height: 420px;
+  --popover-height: 360px;
+  --popover-pad: 18px;
 
-  /* Expanded report dimensions */
   --report-width: 960px;
   --report-height: 640px;
   --report-min-width: 800px;
@@ -127,55 +146,40 @@
 
 @media (prefers-color-scheme: light) {
   :root {
-    --color-bg-base: #faf6f1;
-    --color-bg-surface: rgba(255, 252, 247, 0.72);
-    --color-bg-surface-hover: rgba(248, 243, 236, 0.85);
-    --color-bg-card: rgba(255, 255, 255, 0.55);
-    --color-bg-card-hover: rgba(255, 255, 255, 0.7);
-    --color-bg-elevated: rgba(255, 255, 255, 0.75);
+    color-scheme: light;
 
-    --color-border: rgba(120, 90, 60, 0.1);
-    --color-border-subtle: rgba(120, 90, 60, 0.06);
-    --color-border-hover: rgba(120, 90, 60, 0.15);
-    --color-border-focus: rgba(13, 148, 136, 0.4);
+    --color-bg-base: oklch(96% 0.014 65);
+    --color-bg-surface: oklch(98% 0.012 65 / 0.82);
+    --color-bg-surface-hover: oklch(95% 0.014 65 / 0.92);
+    --color-bg-card: oklch(99% 0.008 65 / 0.7);
+    --color-bg-card-hover: oklch(99% 0.008 65 / 0.85);
+    --color-bg-elevated: oklch(99% 0.006 65 / 0.85);
 
-    --color-text: rgba(30, 22, 15, 0.92);
-    --color-text-secondary: rgba(60, 45, 30, 0.6);
-    --color-text-muted: rgba(60, 45, 30, 0.35);
+    --color-rule: oklch(35% 0.04 65 / 0.10);
+    --color-rule-strong: oklch(35% 0.04 65 / 0.18);
+    --color-border: oklch(35% 0.04 65 / 0.12);
+    --color-border-subtle: oklch(35% 0.04 65 / 0.07);
+    --color-border-hover: oklch(35% 0.04 65 / 0.18);
+    --color-border-focus: oklch(56% 0.13 180 / 0.5);
 
-    --color-accent: #0d9488;
-    --color-accent-dim: rgba(13, 148, 136, 0.1);
-    --color-accent-muted: rgba(13, 148, 136, 0.2);
+    --color-text: oklch(22% 0.02 65 / 0.94);
+    --color-text-secondary: oklch(40% 0.04 65 / 0.66);
+    --color-text-muted: oklch(50% 0.04 65 / 0.48);
 
-    --color-safe: #16a34a;
-    --color-safe-dim: rgba(22, 163, 74, 0.1);
-    --color-warn: #d97706;
-    --color-warn-dim: rgba(217, 119, 6, 0.1);
-    --color-danger: #dc2626;
-    --color-danger-dim: rgba(220, 38, 38, 0.1);
+    --color-accent: oklch(56% 0.13 180);
+    --color-accent-dim: oklch(56% 0.13 180 / 0.10);
+    --color-accent-muted: oklch(56% 0.13 180 / 0.20);
 
-    --color-track: rgba(60, 45, 30, 0.08);
-    --color-overlay: rgba(250, 246, 241, 0.6);
+    --color-safe: oklch(60% 0.16 162);
+    --color-safe-dim: oklch(60% 0.16 162 / 0.10);
+    --color-warn: oklch(60% 0.16 55);
+    --color-warn-dim: oklch(60% 0.16 55 / 0.12);
+    --color-danger: oklch(54% 0.22 25);
+    --color-danger-dim: oklch(54% 0.22 25 / 0.12);
 
-    --glass-tint: rgba(251, 146, 60, 0.02);
+    --color-track: oklch(35% 0.04 65 / 0.10);
+    --color-overlay: oklch(98% 0.012 65 / 0.62);
+
+    --glass-tint: oklch(72% 0.10 55 / 0.03);
   }
-}
-
-/* ─── Semantic aliases (for threshold-based color mapping) ─── */
-
-:root {
-  --color-threshold-safe: var(--color-safe);
-  --color-threshold-safe-dim: var(--color-safe-dim);
-  --color-threshold-warn: var(--color-warn);
-  --color-threshold-warn-dim: var(--color-warn-dim);
-  --color-threshold-danger: var(--color-danger);
-  --color-threshold-danger-dim: var(--color-danger-dim);
-}
-
-/* ─── Gradient presets ─── */
-
-:root {
-  --gradient-safe: linear-gradient(90deg, var(--color-safe), var(--color-accent));
-  --gradient-warn: linear-gradient(90deg, var(--color-accent), var(--color-warn));
-  --gradient-danger: linear-gradient(90deg, var(--color-warn), var(--color-danger));
 }

@@ -10,7 +10,6 @@ import './styles/tokens.css';
 
 export function App() {
   const init = useAppStore((s) => s.init);
-  const usage = useAppStore((s) => s.usage);
   const authRequired = useAppStore((s) => s.authRequired);
   const conflict = useAppStore((s) => s.conflict);
   const [initialized, setInitialized] = useState(false);
@@ -41,10 +40,11 @@ export function App() {
     return <AuthConflictChooser />;
   }
 
-  // Only redirect to AuthPanel for an *explicit* auth-required signal, or when
-  // the first fetch returned no usage AND we have no Claude Code creds to fall
-  // back on. The initial null-usage state is handled by `initialized` above.
-  if (authRequired || !usage) {
+  // Only redirect to AuthPanel on an explicit auth-required signal from the
+  // backend. A null `usage` just means the first poll hasn't landed yet —
+  // CompactPopover handles that with a Loading state. Conflating "loading"
+  // with "auth needed" caused every cold start to flash the sign-in screen.
+  if (authRequired) {
     return <AuthPanel />;
   }
 
