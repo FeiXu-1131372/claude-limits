@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { Toggle } from '../components/ui/Toggle';
 import { Slider } from '../components/ui/Slider';
-import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { useAppStore } from '../lib/store';
@@ -85,16 +84,14 @@ export function SettingsPanel() {
             checked={local.launch_at_login}
             onChange={(e) => update('launch_at_login', e.target.checked)}
           />
-          <Select
-            label="Theme"
-            options={[
-              { value: 'system', label: 'System' },
-              { value: 'light', label: 'Light' },
-              { value: 'dark', label: 'Dark' },
-            ]}
-            value={local.theme}
-            onChange={(e) => update('theme', e.target.value)}
-          />
+          {/* Theme picker hidden for now — only the dark glass theme is
+           * implemented. The Select used to offer Light/Dark/System options
+           * but selecting any of them did nothing visually, which felt like
+           * a broken control. The setting still lives on `local.theme` for
+           * when light theme is reintroduced as an explicit toggle. */}
+          <p className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)] py-[var(--space-2xs)]">
+            Theme: dark (light theme coming later)
+          </p>
         </Card>
       </section>
 

@@ -56,8 +56,10 @@ export function InstrumentColumn({
         {label}
       </span>
 
-      {/* Hero number */}
-      <div className="flex items-baseline gap-[2px]">
+      {/* Hero number — the % sits at the digit's CAP-height (top edge), not its
+       * baseline, so the digit + unit read as a single integrated cluster. The
+       * % is also bumped from 24px to 32px to give it more visual weight. */}
+      <div className="flex items-start gap-[3px]">
         {value == null ? (
           <span
             className="text-[length:var(--text-display)] text-[color:var(--color-text-muted)] leading-[var(--leading-display)]"
@@ -69,11 +71,12 @@ export function InstrumentColumn({
           <>
             <HeroNumber value={Math.round(value)} />
             <span
-              className="text-[length:var(--text-pct)] font-[var(--weight-medium)] text-[color:var(--color-text-secondary)]"
+              className="font-[var(--weight-medium)] text-[color:var(--color-text-secondary)] mt-[8px]"
               style={{
                 fontFamily: 'var(--font-mono)',
-                lineHeight: 'var(--leading-hero)',
-                letterSpacing: 'var(--tracking-hero)',
+                fontSize: '32px',
+                lineHeight: 1,
+                letterSpacing: '-0.02em',
               }}
             >
               %
@@ -154,12 +157,17 @@ export function InstrumentRow({
 
 /* ─── Hairline meter ─── */
 
+/**
+ * Slightly thicker than a section divider so a near-full danger meter doesn't
+ * read as another rule line. The hero column meter is 4px, the inline-row
+ * meter is 3px — both visibly above the 1px hairline dividers.
+ */
 function Meter({ value, level, small }: { value: number; level: Level; small?: boolean }) {
   return (
     <div
       className="relative w-full overflow-hidden rounded-full"
       style={{
-        height: small ? '2px' : '3px',
+        height: small ? '3px' : '4px',
         background: 'var(--color-track)',
       }}
     >

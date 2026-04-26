@@ -78,13 +78,7 @@ export function CompactPopover() {
     return (
       <Shell>
         <Header title="Settings" onBack={() => setView('home')} />
-        {/* Explicit inline padding so it's robust to Tailwind utility quirks —
-         * earlier the px-[var(--popover-pad)] was rendering as 0 in some
-         * configurations, leaving section headings flush against the edge. */}
-        <div
-          className="flex-1 overflow-y-auto"
-          style={{ padding: '4px 18px 16px 18px' }}
-        >
+        <div className="flex-1 overflow-y-auto px-[var(--popover-pad)] pb-[var(--space-md)] pt-[var(--space-xs)]">
           <SettingsPanel />
         </div>
       </Shell>

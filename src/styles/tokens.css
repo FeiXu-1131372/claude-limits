@@ -26,16 +26,16 @@
   --color-bg-base: oklch(20% 0.012 65);
   --color-bg-surface: oklch(22% 0.014 65 / 0.78);
   --color-bg-surface-hover: oklch(26% 0.014 65 / 0.88);
-  --color-bg-card: oklch(28% 0.018 65 / 0.55);
-  --color-bg-card-hover: oklch(32% 0.020 65 / 0.65);
-  --color-bg-elevated: oklch(34% 0.022 65 / 0.72);
+  --color-bg-card: oklch(34% 0.022 65 / 0.70);          /* bumped — was 0.55, didn't separate from base */
+  --color-bg-card-hover: oklch(38% 0.024 65 / 0.80);
+  --color-bg-elevated: oklch(40% 0.026 65 / 0.78);
 
   /* Borders / hairline rules */
   --color-rule: oklch(95% 0.02 65 / 0.08);
   --color-rule-strong: oklch(95% 0.02 65 / 0.16);
-  --color-border: oklch(95% 0.02 65 / 0.14);
-  --color-border-subtle: oklch(95% 0.02 65 / 0.08);
-  --color-border-hover: oklch(95% 0.02 65 / 0.22);
+  --color-border: oklch(95% 0.02 65 / 0.22);            /* bumped from 0.14 so cards have a visible outline */
+  --color-border-subtle: oklch(95% 0.02 65 / 0.10);
+  --color-border-hover: oklch(95% 0.02 65 / 0.30);
   --color-border-focus: oklch(72% 0.13 180 / 0.5);
 
   /* Text — alphas tuned to stay legible over the popover's warm-dark base
@@ -166,7 +166,7 @@
 
   /* Window dimensions */
   --popover-width: 360px;
-  --popover-height: 280px;
+  --popover-height: 320px;
 
   /* Progress bar heights */
   --bar-hairline: 2px;

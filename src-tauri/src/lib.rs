@@ -137,7 +137,7 @@ pub fn run() {
             // oversized on first run after the upgrade.
             if let Some(popover) = app.get_webview_window("popover") {
                 use tauri::{LogicalSize, Size};
-                let _ = popover.set_size(Size::Logical(LogicalSize::new(360.0, 280.0)));
+                let _ = popover.set_size(Size::Logical(LogicalSize::new(360.0, 320.0)));
             }
 
             // Always start with the report window hidden — the user opens it

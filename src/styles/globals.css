@@ -1,28 +1,26 @@
 @import "tailwindcss";
 @import "./tokens.css";
 
-/* ─── Reset ─── */
-
-*,
-*::before,
-*::after {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-/* Tailwind v4's preflight points html to its own --default-font-family which
- * doesn't see our token. Repeat the system stack on the elements that don't
- * inherit font-family by default (button/input) so the popover renders in
- * SF Pro, not whatever fallback the webview lands on. */
-html,
-body,
-button,
-input,
-select,
-textarea {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI',
-    system-ui, sans-serif;
+/* Tailwind v4 already supplies a universal margin/padding/box-sizing reset
+ * inside its preflight (which lives in @layer base). The previous custom
+ * reset here was UNLAYERED, which made it win over @layer utilities — that's
+ * why every `px-[var(--popover-pad)]` resolved to padding 0 at runtime even
+ * though Tailwind generated the rule. Putting reset rules inside @layer base
+ * fixes the layer cascade so utilities take priority again. */
+@layer base {
+  /* Tailwind v4's preflight points html to its own --default-font-family which
+   * doesn't see our token. Repeat the system stack on the elements that don't
+   * inherit font-family by default (button/input) so the popover renders in
+   * SF Pro, not whatever fallback the webview lands on. */
+  html,
+  body,
+  button,
+  input,
+  select,
+  textarea {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI',
+      system-ui, sans-serif;
+  }
 }
 
 html {
