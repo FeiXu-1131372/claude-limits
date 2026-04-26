@@ -38,10 +38,11 @@
   --color-border-hover: oklch(95% 0.02 65 / 0.22);
   --color-border-focus: oklch(72% 0.13 180 / 0.5);
 
-  /* Text */
-  --color-text: oklch(96% 0.01 65 / 0.94);
-  --color-text-secondary: oklch(80% 0.025 65 / 0.62);
-  --color-text-muted: oklch(70% 0.025 65 / 0.42);
+  /* Text — alphas tuned to stay legible over the popover's warm-dark base
+   * even when the user's wallpaper bleeds through the vibrancy slightly. */
+  --color-text: oklch(96% 0.01 65 / 0.96);
+  --color-text-secondary: oklch(86% 0.02 65 / 0.78);
+  --color-text-muted: oklch(78% 0.025 65 / 0.62);
 
   /* Single-hue accent (teal) */
   --color-accent: oklch(72% 0.13 180);

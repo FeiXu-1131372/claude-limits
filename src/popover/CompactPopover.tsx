@@ -1,13 +1,41 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type MouseEvent } from 'react';
 import { motion } from 'framer-motion';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Banner } from '../components/ui/Banner';
 import { IconButton } from '../components/ui/IconButton';
 import { SettingsPanel } from '../settings/SettingsPanel';
 import { useAppStore } from '../lib/store';
 import { ipc } from '../lib/ipc';
-import { IconRefresh, IconSettings, ChevronRight } from '../lib/icons';
+import { IconRefresh, IconSettings, ChevronRight, X } from '../lib/icons';
 import { InstrumentColumn, InstrumentRow } from './InstrumentRow';
 import type { Utilization } from '../lib/types';
+
+/**
+ * Programmatic drag handler — Tauri's `data-tauri-drag-region` attribute
+ * relies on a runtime listener that doesn't always activate on transparent,
+ * always-on-top popover windows. Calling startDragging() explicitly on
+ * mousedown is the reliable path. We skip the call when the user clicks an
+ * actual interactive element so buttons keep working.
+ */
+async function handleDragStart(e: MouseEvent<HTMLElement>) {
+  if (e.button !== 0) return;
+  const target = e.target as HTMLElement;
+  if (target.closest('button, input, a, select, textarea')) return;
+  e.preventDefault();
+  try {
+    await getCurrentWindow().startDragging();
+  } catch {
+    // No-op when running outside Tauri (e.g. localhost demo page).
+  }
+}
+
+async function closePopover() {
+  try {
+    await getCurrentWindow().hide();
+  } catch {
+    // Same — silently no-op outside Tauri.
+  }
+}
 
 function formatRelativeTime(iso: string): string {
   const t = new Date(iso).getTime();
@@ -50,7 +78,13 @@ export function CompactPopover() {
     return (
       <Shell>
         <Header title="Settings" onBack={() => setView('home')} />
-        <div className="flex-1 overflow-y-auto px-[var(--popover-pad)] pb-[var(--space-md)]">
+        {/* Explicit inline padding so it's robust to Tailwind utility quirks —
+         * earlier the px-[var(--popover-pad)] was rendering as 0 in some
+         * configurations, leaving section headings flush against the edge. */}
+        <div
+          className="flex-1 overflow-y-auto"
+          style={{ padding: '4px 18px 16px 18px' }}
+        >
           <SettingsPanel />
         </div>
       </Shell>
@@ -223,9 +257,10 @@ function ChromeBar({
   return (
     <div
       data-tauri-drag-region
+      onMouseDown={handleDragStart}
       className="flex items-center justify-between gap-[var(--space-sm)] px-[var(--popover-pad)] pt-[var(--space-md)] pb-[var(--space-sm)] cursor-default select-none"
     >
-      <div data-tauri-drag-region className="flex items-center gap-[var(--space-xs)]">
+      <div className="flex items-center gap-[var(--space-xs)] pointer-events-none">
         <span className="text-[length:var(--text-label)] font-[var(--weight-semibold)] text-[color:var(--color-text-secondary)] tracking-[var(--tracking-label)] uppercase">
           Claude
         </span>
@@ -247,6 +282,9 @@ function ChromeBar({
         </IconButton>
         <IconButton label="Settings" onClick={onSettings}>
           <IconSettings size={13} />
+        </IconButton>
+        <IconButton label="Close" onClick={closePopover}>
+          <X size={13} />
         </IconButton>
       </div>
     </div>
