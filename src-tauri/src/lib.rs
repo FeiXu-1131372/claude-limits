@@ -179,29 +179,25 @@ pub fn run() {
                 }
             }
 
-            // Tray icon
+            // Tray icon — configure the one Tauri auto-created from the
+            // `trayIcon` block in tauri.conf.json. Don't build a NEW one
+            // (that would create a second NSStatusItem that competes with
+            // the visible config-driven one — when the user reported "two
+            // duplicated icons" earlier, that was this exact double-creation,
+            // and removing the config block left us with only the invisible
+            // programmatic item).
             use tauri::menu::{MenuBuilder, MenuItem};
-            use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-
-            tracing::info!("creating tray icon...");
+            use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
 
             let show = MenuItem::with_id(app, "show", "Show popover", true, None::<&str>)?;
             let expand = MenuItem::with_id(app, "expand", "Open expanded report", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = MenuBuilder::new(app).items(&[&show, &expand, &quit]).build()?;
 
-            let tray_result = TrayIconBuilder::with_id("main")
-                .tooltip("Claude Usage Monitor")
-                // Initial title "—" makes the tray item visibly wider on
-                // creation so users can spot it even before the first poll
-                // populates the percentage. Replaced once the poll lands.
-                .title("Claude —")
-                .icon(tauri::image::Image::from_bytes(include_bytes!(
-                    "../icons/tray/idle-template.png"
-                ))?)
-                .icon_as_template(true)
-                .menu(&menu)
-                .on_menu_event(|app, event| match event.id.as_ref() {
+            if let Some(tray) = app.tray_by_id("main") {
+                tracing::info!("attaching menu + handlers to config-created tray");
+                let _ = tray.set_menu(Some(menu));
+                tray.on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(w) = app.get_webview_window("popover") {
                             let _ = w.show();
@@ -216,8 +212,8 @@ pub fn run() {
                     }
                     "quit" => app.exit(0),
                     _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
+                });
+                tray.on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
@@ -234,14 +230,12 @@ pub fn run() {
                             }
                         }
                     }
-                })
-                .build(app);
-
-            match &tray_result {
-                Ok(_) => tracing::info!("tray icon created successfully"),
-                Err(e) => tracing::error!("tray icon FAILED to create: {e:?}"),
+                });
+            } else {
+                tracing::error!(
+                    "tray_by_id('main') returned None — tauri.conf.json `trayIcon` block missing?"
+                );
             }
-            tray_result?;
 
             poll_loop::spawn(handle.clone(), state.clone());
 
