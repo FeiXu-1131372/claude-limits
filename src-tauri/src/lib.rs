@@ -183,13 +183,19 @@ pub fn run() {
             use tauri::menu::{MenuBuilder, MenuItem};
             use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
+            tracing::info!("creating tray icon...");
+
             let show = MenuItem::with_id(app, "show", "Show popover", true, None::<&str>)?;
             let expand = MenuItem::with_id(app, "expand", "Open expanded report", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = MenuBuilder::new(app).items(&[&show, &expand, &quit]).build()?;
 
-            TrayIconBuilder::with_id("main")
+            let tray_result = TrayIconBuilder::with_id("main")
                 .tooltip("Claude Usage Monitor")
+                // Initial title "—" makes the tray item visibly wider on
+                // creation so users can spot it even before the first poll
+                // populates the percentage. Replaced once the poll lands.
+                .title("Claude —")
                 .icon(tauri::image::Image::from_bytes(include_bytes!(
                     "../icons/tray/idle-template.png"
                 ))?)
@@ -229,7 +235,13 @@ pub fn run() {
                         }
                     }
                 })
-                .build(app)?;
+                .build(app);
+
+            match &tray_result {
+                Ok(_) => tracing::info!("tray icon created successfully"),
+                Err(e) => tracing::error!("tray icon FAILED to create: {e:?}"),
+            }
+            tray_result?;
 
             poll_loop::spawn(handle.clone(), state.clone());
 
