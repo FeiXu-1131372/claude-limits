@@ -1,4 +1,4 @@
-import { useMemo, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { motion } from 'framer-motion';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Banner } from '../components/ui/Banner';
@@ -86,22 +86,7 @@ export function CompactPopover() {
   }
 
   if (!usage) {
-    return (
-      <Shell>
-        <ChromeBar
-          live={false}
-          stale={false}
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          onSettings={() => setView('settings')}
-        />
-        <div className="flex flex-1 items-center justify-center">
-          <span className="text-[length:var(--text-label)] text-[color:var(--color-text-muted)]">
-            Loading…
-          </span>
-        </div>
-      </Shell>
-    );
+    return <LoadingShell refreshing={refreshing} onRefresh={handleRefresh} onSettings={() => setView('settings')} />;
   }
 
   const snap = usage.snapshot;
@@ -218,6 +203,71 @@ export function CompactPopover() {
 }
 
 /* ───────────────────────── Sub-components ───────────────────────── */
+
+/**
+ * Shown while `usage` is still null. Self-heals by:
+ *   1. Kicking ipc.forceRefresh() the moment it mounts so the Rust poll loop
+ *      wakes up and emits usage_updated immediately, instead of waiting for
+ *      the next scheduled poll (default 5 min).
+ *   2. Polling ipc.getCurrentUsage() every second in case a poll already
+ *      succeeded but its event landed before the webview was listening
+ *      (Tauri can drop events fired before the listener registers).
+ *   3. Showing the user a clear "Tap refresh if this hangs" affordance after
+ *      ~3s so they're not staring at a spinner indefinitely.
+ */
+function LoadingShell({
+  refreshing,
+  onRefresh,
+  onSettings,
+}: {
+  refreshing: boolean;
+  onRefresh: () => void;
+  onSettings: () => void;
+}) {
+  const refreshUsage = useAppStore((s) => s.refreshUsage);
+  const [hint, setHint] = useState(false);
+
+  useEffect(() => {
+    // Wake the poll loop now.
+    ipc.forceRefresh().catch(() => {});
+
+    // Fall back to polling the cached snapshot in case the usage_updated
+    // event was emitted before this webview's listener registered.
+    const tick = setInterval(() => {
+      refreshUsage().catch(() => {});
+    }, 1000);
+
+    // Surface a manual hint if loading drags.
+    const hintTimer = setTimeout(() => setHint(true), 3000);
+
+    return () => {
+      clearInterval(tick);
+      clearTimeout(hintTimer);
+    };
+  }, [refreshUsage]);
+
+  return (
+    <Shell>
+      <ChromeBar
+        live={false}
+        stale={false}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        onSettings={onSettings}
+      />
+      <div className="flex flex-1 flex-col items-center justify-center gap-[var(--space-sm)] px-[var(--popover-pad)] text-center">
+        <span className="text-[length:var(--text-label)] text-[color:var(--color-text-muted)]">
+          Loading usage…
+        </span>
+        {hint && (
+          <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)] opacity-70">
+            Taking longer than expected — tap the refresh icon.
+          </span>
+        )}
+      </div>
+    </Shell>
+  );
+}
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
