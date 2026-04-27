@@ -34,8 +34,8 @@
       }
     ],
     "trayIcon": {
-      "iconPath": "icons/tray/idle-template.png",
-      "iconAsTemplate": true,
+      "iconPath": "icons/tray/boot-placeholder.png",
+      "iconAsTemplate": false,
       "menuOnLeftClick": false
     },
     "security": {

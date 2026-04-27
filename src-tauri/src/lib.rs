@@ -7,6 +7,7 @@ pub mod notifier;
 mod poll_loop;
 pub mod store;
 mod tray;
+mod tray_icon;
 pub mod usage_api;
 
 use app_state::AppState;
