@@ -2,7 +2,7 @@ use crate::app_state::{AppState, CachedUsage};
 use crate::auth::AuthError;
 use crate::notifier;
 use crate::tray;
-use crate::usage_api::{next_backoff, FetchOutcome};
+use crate::usage_api::{next_backoff, FetchOutcome, UsageSnapshot};
 use chrono::Utc;
 use serde_json::json;
 use std::sync::Arc;
@@ -132,18 +132,45 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
             PollResult::Ok
         }
         FetchOutcome::Unauthorized => {
+            tracing::warn!("usage api unauthorized; surfacing auth_required");
             tray::set_level(handle, None, None, None, true);
             let _ = handle.emit("auth_required", ());
             PollResult::Transient
         }
-        FetchOutcome::RateLimited => PollResult::Backoff,
+        FetchOutcome::RateLimited => {
+            tracing::warn!("usage api rate-limited; backing off");
+            PollResult::Backoff
+        }
         FetchOutcome::Transient(e) => {
-            let current = state.cached_usage.read().clone();
-            if let Some(mut c) = current {
-                c.last_error = Some(e);
-                *state.cached_usage.write() = Some(c.clone());
-                let _ = handle.emit("usage_updated", &c);
-            }
+            tracing::warn!("usage api transient error: {e}");
+            // On the very first poll, cached_usage is None and the previous
+            // implementation dropped the error here — leaving the popover in
+            // an indefinite "Loading…" state with nothing in logs and no
+            // event to the frontend. Synthesize an empty placeholder so the
+            // popover can render its normal layout (em-dashes for missing
+            // numbers) plus the stale banner driven by last_error.
+            let placeholder = state.cached_usage.read().clone().map_or_else(
+                || CachedUsage {
+                    snapshot: UsageSnapshot {
+                        five_hour: None,
+                        seven_day: None,
+                        seven_day_sonnet: None,
+                        seven_day_opus: None,
+                        extra_usage: None,
+                        fetched_at: Utc::now(),
+                        unknown: Default::default(),
+                    },
+                    account_id: account.id.0.clone(),
+                    account_email: account.email.clone(),
+                    last_error: Some(e.clone()),
+                },
+                |mut c| {
+                    c.last_error = Some(e.clone());
+                    c
+                },
+            );
+            *state.cached_usage.write() = Some(placeholder.clone());
+            let _ = handle.emit("usage_updated", &placeholder);
             PollResult::Transient
         }
     }

@@ -58,8 +58,14 @@ impl UsageClient {
 
         let resp = match req.send().await {
             Ok(r) => r,
-            Err(e) if e.is_timeout() => return FetchOutcome::Transient("timeout".into()),
-            Err(e) => return FetchOutcome::Transient(e.to_string()),
+            Err(e) if e.is_timeout() => {
+                tracing::warn!("usage fetch timed out: {e}");
+                return FetchOutcome::Transient("timeout".into());
+            }
+            Err(e) => {
+                tracing::warn!("usage fetch network error: {e}");
+                return FetchOutcome::Transient(e.to_string());
+            }
         };
 
         match resp.status() {
@@ -68,12 +74,27 @@ impl UsageClient {
                     s.fetched_at = Utc::now();
                     FetchOutcome::Ok(s)
                 }
-                Err(e) => FetchOutcome::Transient(format!("decode: {e}")),
+                Err(e) => {
+                    tracing::warn!("usage decode failed: {e}");
+                    FetchOutcome::Transient(format!("decode: {e}"))
+                }
             },
-            StatusCode::UNAUTHORIZED => FetchOutcome::Unauthorized,
-            StatusCode::TOO_MANY_REQUESTS => FetchOutcome::RateLimited,
-            s if s.is_server_error() => FetchOutcome::Transient(format!("status: {s}")),
-            other => FetchOutcome::Transient(format!("unexpected status: {other}")),
+            StatusCode::UNAUTHORIZED => {
+                tracing::warn!("usage fetch returned 401 unauthorized");
+                FetchOutcome::Unauthorized
+            }
+            StatusCode::TOO_MANY_REQUESTS => {
+                tracing::warn!("usage fetch returned 429 rate-limited");
+                FetchOutcome::RateLimited
+            }
+            s if s.is_server_error() => {
+                tracing::warn!("usage fetch server error: {s}");
+                FetchOutcome::Transient(format!("status: {s}"))
+            }
+            other => {
+                tracing::warn!("usage fetch unexpected status: {other}");
+                FetchOutcome::Transient(format!("unexpected status: {other}"))
+            }
         }
     }
 }
