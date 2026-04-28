@@ -1,7 +1,7 @@
 use crate::tray_icon;
 use chrono::{DateTime, Utc};
 use tauri::image::Image;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 /// Updates the tray icon. The icon is synthesized on every call from the
 /// live percentages — no static asset paths are involved.
@@ -19,8 +19,16 @@ pub fn set_level(
     let Some(tray) = app.tray_by_id("main") else { return };
 
     let bytes = tray_icon::render(five_hour, seven_day, paused);
-    let _ = tray.set_icon(Some(Image::from_bytes(&bytes).expect("renderer produces valid png")));
+    let img = Image::from_bytes(&bytes).expect("renderer produces valid png");
+    
+    let _ = tray.set_icon(Some(img.clone()));
     let _ = tray.set_icon_as_template(false);
+    
+    // Also update the main window's taskbar icon dynamically
+    if let Some(win) = app.get_webview_window("popover") {
+        let _ = win.set_icon(img);
+    }
+
     // Numbers live in the icon now — no separate title text alongside.
     let _ = tray.set_title(None::<&str>);
     let _ = tray.set_tooltip(Some(tooltip(
