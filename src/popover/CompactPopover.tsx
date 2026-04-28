@@ -8,7 +8,7 @@ import { useAppStore } from '../lib/store';
 import { ipc } from '../lib/ipc';
 import { IconRefresh, IconSettings, ChevronRight, X } from '../lib/icons';
 import { InstrumentColumn, InstrumentRow } from './InstrumentRow';
-import type { Utilization } from '../lib/types';
+import type { BurnRateProjection, Utilization } from '../lib/types';
 
 /**
  * Programmatic drag handler — Tauri's `data-tauri-drag-region` attribute
@@ -130,12 +130,19 @@ export function CompactPopover() {
         transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
         className="grid grid-cols-2 gap-x-[var(--space-lg)] px-[var(--popover-pad)] pt-[var(--space-md)] pb-[var(--space-lg)]"
       >
-        <InstrumentColumn
-          label="5h"
-          data={snap.five_hour}
-          warnAt={warn}
-          dangerAt={danger}
-        />
+        <div className="flex flex-col gap-[var(--space-xs)]">
+          <InstrumentColumn
+            label="5h"
+            data={snap.five_hour}
+            warnAt={warn}
+            dangerAt={danger}
+          />
+          <BurnRateCaption
+            burnRate={usage.burn_rate}
+            warnAt={warn}
+            dangerAt={danger}
+          />
+        </div>
         <InstrumentColumn
           label="7d"
           data={snap.seven_day}
@@ -203,6 +210,47 @@ export function CompactPopover() {
 }
 
 /* ───────────────────────── Sub-components ───────────────────────── */
+
+/**
+ * Tiny caption beneath the 5h instrument that answers "should I keep
+ * coding?" — extrapolates current usage slope to the window reset and
+ * shows the projected % at reset. Color-cued against the same warn/danger
+ * thresholds the meter uses. Hidden when there's no projection yet
+ * (cold start) or when the projection is essentially flat.
+ */
+function BurnRateCaption({
+  burnRate,
+  warnAt,
+  dangerAt,
+}: {
+  burnRate: BurnRateProjection | null;
+  warnAt: number;
+  dangerAt: number;
+}) {
+  if (!burnRate) return null;
+  // Hide jitter under ~0.1%/min — anything that small extrapolates to a
+  // ≤6% delta over a full 5h window, which isn't actionable signal.
+  if (Math.abs(burnRate.utilization_per_min) < 0.1) return null;
+
+  const projected = Math.max(0, burnRate.projected_at_reset);
+  const color =
+    projected >= dangerAt
+      ? 'var(--color-danger)'
+      : projected >= warnAt
+        ? 'var(--color-warn)'
+        : 'var(--color-text-muted)';
+
+  return (
+    <span
+      className="text-[length:var(--text-micro)] tabular-nums"
+      style={{ color }}
+      title={`${burnRate.utilization_per_min >= 0 ? '+' : ''}${burnRate.utilization_per_min.toFixed(2)}%/min`}
+    >
+      → ~{Math.round(projected)}% by reset
+    </span>
+  );
+}
+
 
 /**
  * Shown while `usage` is still null. Self-heals by:

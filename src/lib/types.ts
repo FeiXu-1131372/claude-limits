@@ -22,11 +22,19 @@ export interface UsageSnapshot {
   fetched_at: string;
 }
 
+export interface BurnRateProjection {
+  /** Slope of five_hour.utilization in percentage points per minute. */
+  utilization_per_min: number;
+  /** Projected utilization at five_hour.resets_at if the current pace continues. */
+  projected_at_reset: number;
+}
+
 export interface CachedUsage {
   snapshot: UsageSnapshot;
   account_id: string;
   account_email: string;
   last_error: string | null;
+  burn_rate: BurnRateProjection | null;
 }
 
 export interface DailyBucket {

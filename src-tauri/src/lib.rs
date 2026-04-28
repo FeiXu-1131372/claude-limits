@@ -36,6 +36,7 @@ pub fn run() {
         pending_oauth: parking_lot::RwLock::new(None),
         fallback_dir: data_dir.clone(),
         force_refresh: tokio::sync::Notify::new(),
+        recent_five_hour: parking_lot::RwLock::new(std::collections::VecDeque::new()),
     });
 
     // tauri-specta's Builder::commands replaces previously registered commands rather
