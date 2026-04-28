@@ -1,9 +1,9 @@
-# Claude Usage Monitor — Design Specification
+# Claude Limits — Design Specification
 
 **Date:** 2026-04-24
 **Revision:** 2 (post spec-review — see `docs/spec-review.md`)
 **Status:** Design approved, pending implementation plan
-**Project directory:** `claude-usage-monitor/` (working name — rename before public release)
+**Project directory:** `claude-limits/` (working name — rename before public release)
 
 ---
 
@@ -104,7 +104,7 @@ A cross-platform (macOS + Windows) menu-bar utility that monitors a Claude subsc
 
 - `Authorization: Bearer <access_token>`
 - `anthropic-beta: oauth-2025-04-20` (without this header the endpoint returns 4xx)
-- `User-Agent: claude-usage-monitor/<version>` (cosmetic, but polite)
+- `User-Agent: claude-limits/<version>` (cosmetic, but polite)
 
 ### Component responsibilities
 
@@ -401,7 +401,7 @@ configured interval.
     response = client.get("https://api.anthropic.com/api/oauth/usage")
       .header("Authorization", format!("Bearer {token}"))
       .header("anthropic-beta", "oauth-2025-04-20")
-      .header("User-Agent", "claude-usage-monitor/<ver>")
+      .header("User-Agent", "claude-limits/<ver>")
       .timeout(30s)
       .send()
 
@@ -572,7 +572,7 @@ The `< resets_at` check auto-clears state on each reset, so next day's crossing 
 
 | Failure | Response |
 |---|---|
-| macOS Gatekeeper blocks launch (unsigned) | README: `xattr -d com.apple.quarantine "Claude Usage Monitor.app"` |
+| macOS Gatekeeper blocks launch (unsigned) | README: `xattr -d com.apple.quarantine "Claude Limits.app"` |
 | Windows: WebView2 runtime missing on Win10 | Tauri auto-bootstraps the runtime installer. Fallback: error dialog with MS download link. |
 | Windows SmartScreen blocks launch | README: "More info → Run anyway." |
 | tauri-plugin-autostart fails silently on unsigned macOS app | Fallback: write `~/Library/LaunchAgents/com.claude-monitor.plist` manually; detect failure and show Settings notice. |

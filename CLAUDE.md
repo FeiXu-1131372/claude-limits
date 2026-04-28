@@ -43,4 +43,4 @@ Glassy native widget — feels like it belongs in the OS, not like a standalone 
 - `src/` — React frontend (UI-only, no filesystem/network access)
 - `src-tauri/` — Rust backend (auth, API, parser, store, notifier)
 - `docs/` — Spec, design docs
-- Full file layout in `docs/superpowers/specs/2026-04-24-claude-usage-monitor-design.md` Section 3
+- Full file layout in `docs/superpowers/specs/2026-04-24-claude-limits-design.md` Section 3

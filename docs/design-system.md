@@ -1,4 +1,4 @@
-# Design System — Claude Usage Monitor
+# Design System — Claude Limits
 
 ## Visual Language
 

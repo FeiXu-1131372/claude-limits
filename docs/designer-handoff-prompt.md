@@ -10,7 +10,7 @@ You are being dispatched to design the UI system for a cross-platform Claude usa
 ## Read these first
 
 1. The full design spec (already written, do not modify):
-   `/Users/feixu/Developer/open Source/claude-usage-monitor/docs/superpowers/specs/2026-04-24-claude-usage-monitor-design.md`
+   `/Users/feixu/Developer/open Source/claude-limits/docs/superpowers/specs/2026-04-24-claude-limits-design.md`
 
    Read it end-to-end before proposing anything. Pay specific attention to:
    - Section 1 (Overview + requirements table)
@@ -67,7 +67,7 @@ Use the skills rigorously. In particular:
 
 ## Deliverables
 
-Produce all of the following as concrete files in the project at `/Users/feixu/Developer/open Source/claude-usage-monitor/`:
+Produce all of the following as concrete files in the project at `/Users/feixu/Developer/open Source/claude-limits/`:
 
 ### 1. Design tokens (`src/styles/tokens.css`)
 

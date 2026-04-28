@@ -1,4 +1,4 @@
-# Dogfood Report: Claude Usage Monitor — Popover
+# Dogfood Report: Claude Limits — Popover
 
 | Field | Value |
 |-------|-------|

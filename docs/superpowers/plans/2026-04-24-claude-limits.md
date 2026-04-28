@@ -1,4 +1,4 @@
-# Claude Usage Monitor Implementation Plan
+# Claude Limits Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -11,7 +11,7 @@
 - **Frontend:** React 19 + TypeScript, Tailwind CSS v4, Zustand, Recharts, Framer Motion, Lucide icons
 - **Tooling:** pnpm, Vite, Cargo, GitHub Actions (CI matrix: Ubuntu + macOS + Windows)
 
-**Source spec:** `docs/superpowers/specs/2026-04-24-claude-usage-monitor-design.md`
+**Source spec:** `docs/superpowers/specs/2026-04-24-claude-limits-design.md`
 **Existing assets (preserve!):**
 - `src/styles/tokens.css`, `globals.css`
 - `src/lib/motion.ts`, `icons.ts`, `store.ts`
@@ -35,7 +35,7 @@
 - [ ] **Step 1: Initialize git + pnpm and commit baseline**
 
 ```bash
-cd "/Users/feixu/Developer/open Source/claude-usage-monitor"
+cd "/Users/feixu/Developer/open Source/claude-limits"
 git init
 git add -A
 git commit -m "chore: snapshot designer output before bootstrap"
@@ -63,7 +63,7 @@ src/lib/generated/
 
 ```json
 {
-  "name": "claude-usage-monitor",
+  "name": "claude-limits",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -191,7 +191,7 @@ export default defineConfig({
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Claude Usage Monitor</title>
+    <title>Claude Limits</title>
   </head>
   <body>
     <div id="root"></div>
@@ -220,7 +220,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 `src/App.tsx`:
 ```tsx
 export default function App() {
-  return <div style={{ padding: 24 }}>Claude Usage Monitor — bootstrap OK</div>;
+  return <div style={{ padding: 24 }}>Claude Limits — bootstrap OK</div>;
 }
 ```
 
@@ -255,7 +255,7 @@ git commit -m "chore: scaffold pnpm + vite + react 19 + tailwind v4 config"
 - [ ] **Step 1: Initialize Tauri (non-interactive)**
 
 ```bash
-cd "/Users/feixu/Developer/open Source/claude-usage-monitor"
+cd "/Users/feixu/Developer/open Source/claude-limits"
 pnpm tauri init --ci
 ```
 
@@ -265,16 +265,16 @@ Expected: `src-tauri/` directory created with `Cargo.toml`, `tauri.conf.json`, `
 
 ```toml
 [package]
-name = "claude-usage-monitor"
+name = "claude-limits"
 version = "0.1.0"
 description = "Cross-platform Claude subscription usage monitor"
-authors = ["Claude Usage Monitor contributors"]
+authors = ["Claude Limits contributors"]
 license = "MIT"
 edition = "2021"
 rust-version = "1.77"
 
 [lib]
-name = "claude_usage_monitor_lib"
+name = "claude_limits_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -357,8 +357,8 @@ Expected: compilation succeeds (may take several minutes on first run).
 Replace the `app.windows` section so the main window starts hidden (we'll show the popover via tray):
 ```json
 {
-  "productName": "Claude Usage Monitor",
-  "identifier": "com.claude-usage-monitor.app",
+  "productName": "Claude Limits",
+  "identifier": "com.claude-limits.app",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -442,7 +442,7 @@ If `globals.css` does not already contain `@import "tailwindcss";` at the top, i
 pnpm dev
 ```
 
-Expected: browser opens at http://localhost:1420 showing "Claude Usage Monitor — bootstrap OK". Inspect the page — the CSS custom properties from `tokens.css` should be visible in devtools under `:root`.
+Expected: browser opens at http://localhost:1420 showing "Claude Limits — bootstrap OK". Inspect the page — the CSS custom properties from `tokens.css` should be visible in devtools under `:root`.
 
 Kill the dev server with Ctrl+C once verified.
 
@@ -471,11 +471,11 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Env
 pub fn init(log_dir: PathBuf) -> tracing_appender::non_blocking::WorkerGuard {
     std::fs::create_dir_all(&log_dir).ok();
 
-    let file_appender = RollingFileAppender::new(Rotation::DAILY, &log_dir, "claude-usage-monitor.log");
+    let file_appender = RollingFileAppender::new(Rotation::DAILY, &log_dir, "claude-limits.log");
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
     let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info,claude_usage_monitor_lib=debug"));
+        .unwrap_or_else(|_| EnvFilter::new("info,claude_limits_lib=debug"));
 
     tracing_subscriber::registry()
         .with(filter)
@@ -488,7 +488,7 @@ pub fn init(log_dir: PathBuf) -> tracing_appender::non_blocking::WorkerGuard {
 }
 
 pub fn log_dir() -> PathBuf {
-    directories::ProjectDirs::from("com", "claude-usage-monitor", "ClaudeUsageMonitor")
+    directories::ProjectDirs::from("com", "claude-limits", "ClaudeLimits")
         .map(|p| p.data_local_dir().join("logs"))
         .unwrap_or_else(|| PathBuf::from(".claude-monitor/logs"))
 }
@@ -662,7 +662,7 @@ impl Db {
 }
 
 pub fn default_dir() -> PathBuf {
-    directories::ProjectDirs::from("com", "claude-usage-monitor", "ClaudeUsageMonitor")
+    directories::ProjectDirs::from("com", "claude-limits", "ClaudeLimits")
         .map(|p| p.data_local_dir().to_path_buf())
         .unwrap_or_else(|| PathBuf::from(".claude-monitor"))
 }
@@ -712,7 +712,7 @@ mod store;
 - [ ] **Step 5: Run tests and confirm pass**
 
 ```bash
-cd src-tauri && cargo test -p claude-usage-monitor store:: -- --nocapture && cd ..
+cd src-tauri && cargo test -p claude-limits store:: -- --nocapture && cd ..
 ```
 
 Expected: both tests pass.
@@ -1120,7 +1120,7 @@ Add `mod usage_api;` after `mod store;`.
 - [ ] **Step 7: Write round-trip tests as `src-tauri/tests/usage_api_types.rs`**
 
 ```rust
-use claude_usage_monitor_lib::usage_api::types::UsageSnapshot;
+use claude_limits_lib::usage_api::types::UsageSnapshot;
 
 #[test]
 fn standard_account_round_trips() {
@@ -1227,7 +1227,7 @@ impl UsageClient {
             .get(&self.base_url)
             .bearer_auth(access_token)
             .header("anthropic-beta", ANTHROPIC_BETA)
-            .header("User-Agent", format!("claude-usage-monitor/{}", self.app_version));
+            .header("User-Agent", format!("claude-limits/{}", self.app_version));
 
         let resp = match req.send().await {
             Ok(r) => r,
@@ -1289,7 +1289,7 @@ pub use types::{ExtraUsage, UsageSnapshot, Utilization};
 
 Create `src-tauri/tests/usage_api_client.rs`:
 ```rust
-use claude_usage_monitor_lib::usage_api::{FetchOutcome, UsageClient};
+use claude_limits_lib::usage_api::{FetchOutcome, UsageClient};
 use mockito::Server;
 
 #[tokio::test]
@@ -1552,7 +1552,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const KEYRING_SERVICE: &str = "claude-usage-monitor";
+const KEYRING_SERVICE: &str = "claude-limits";
 const KEYRING_USER: &str = "oauth_refresh";
 
 #[derive(Serialize, Deserialize)]
@@ -1735,7 +1735,7 @@ In `src-tauri/src/auth/mod.rs` add `pub mod exchange;`.
 - [ ] **Step 4: Write integration tests `src-tauri/tests/auth_exchange.rs`**
 
 ```rust
-use claude_usage_monitor_lib::auth::exchange::TokenExchange;
+use claude_limits_lib::auth::exchange::TokenExchange;
 use mockito::Server;
 
 #[tokio::test]
@@ -2267,7 +2267,7 @@ Also ensure `usage_api::client::ANTHROPIC_BETA` is public.
 - [ ] **Step 4: Integration test `src-tauri/tests/auth_orchestrator.rs`**
 
 ```rust
-use claude_usage_monitor_lib::auth::{orchestrator::AuthOrchestrator, AuthError};
+use claude_limits_lib::auth::{orchestrator::AuthOrchestrator, AuthError};
 use tempfile::tempdir;
 
 // Note: this test exercises only the no-auth-source path since token_store
@@ -2563,7 +2563,7 @@ printf '%s\n%s' \
 - [ ] **Step 6: Write unit tests as `src-tauri/tests/jsonl_record.rs`**
 
 ```rust
-use claude_usage_monitor_lib::jsonl_parser::SessionEvent;
+use claude_limits_lib::jsonl_parser::SessionEvent;
 
 #[test]
 fn current_schema_parses_every_line() {
@@ -2752,8 +2752,8 @@ pub fn ingest_file(db: &Db, pricing: &PricingTable, path: &Path) -> Result<usize
 
 ```rust
 use chrono::{Duration, Utc};
-use claude_usage_monitor_lib::jsonl_parser::{walker, PricingTable};
-use claude_usage_monitor_lib::store::{Db, StoredAccount};
+use claude_limits_lib::jsonl_parser::{walker, PricingTable};
+use claude_limits_lib::store::{Db, StoredAccount};
 use std::fs;
 use tempfile::tempdir;
 
@@ -4001,7 +4001,7 @@ import "./styles/tokens.css";
 export default function App() {
   const init = useAppStore(s => s.init);
   useEffect(() => { init(); }, [init]);
-  return <div style={{ padding: 24 }}>Claude Usage Monitor — bootstrap OK</div>;
+  return <div style={{ padding: 24 }}>Claude Limits — bootstrap OK</div>;
 }
 ```
 
@@ -5101,7 +5101,7 @@ use tauri::{
     let menu = MenuBuilder::new(app).items(&[&show, &expand, &quit]).build()?;
 
     TrayIconBuilder::with_id("main")
-        .tooltip("Claude Usage Monitor")
+        .tooltip("Claude Limits")
         .icon(tauri::image::Image::from_bytes(include_bytes!("../icons/tray/idle-template.png"))?)
         .icon_as_template(true)
         .menu(&menu)
@@ -5161,7 +5161,7 @@ git commit -m "feat(tray): color-coded tray icon with popover toggle and context
 ```json
 "windows": [
   { "label": "popover", "title": "", "width": 360, "height": 420, "resizable": false, "decorations": false, "transparent": true, "alwaysOnTop": true, "visible": false, "skipTaskbar": true },
-  { "label": "report",  "title": "Claude Usage Monitor", "width": 960, "height": 640, "minWidth": 800, "minHeight": 560, "resizable": true, "visible": false }
+  { "label": "report",  "title": "Claude Limits", "width": 960, "height": 640, "minWidth": 800, "minHeight": 560, "resizable": true, "visible": false }
 ]
 ```
 
@@ -5225,7 +5225,7 @@ import { invoke } from "@tauri-apps/api/core";
 ```bash
 pnpm tauri dev
 # Then in another terminal:
-./src-tauri/target/debug/claude-usage-monitor
+./src-tauri/target/debug/claude-limits
 ```
 
 Expected: second invocation raises the already-running popover rather than starting a new instance.
@@ -5394,7 +5394,7 @@ git commit -m "chore(ci): unsigned release workflow (macOS universal + Windows x
 - [ ] **Step 1: Write `README.md`**
 
 ```markdown
-# Claude Usage Monitor
+# Claude Limits
 
 Cross-platform menu-bar utility for monitoring Claude subscription rate-limits on macOS and Windows.
 
@@ -5409,7 +5409,7 @@ Cross-platform menu-bar utility for monitoring Claude subscription rate-limits o
 ## First launch
 Downloads are **unsigned**. On first launch:
 
-- **macOS:** `xattr -d com.apple.quarantine "/Applications/Claude Usage Monitor.app"` or right-click → Open from Finder.
+- **macOS:** `xattr -d com.apple.quarantine "/Applications/Claude Limits.app"` or right-click → Open from Finder.
 - **Windows:** SmartScreen → "More info" → "Run anyway".
 
 WebView2 is required on Windows 10 (Windows 11 ships it). If missing, the installer auto-bootstraps it.
@@ -5552,7 +5552,7 @@ All three blocking gaps from `docs/spec-review.md` (v2) are closed:
 
 ## Execution Handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-04-24-claude-usage-monitor.md`. Two execution options:
+Plan complete and saved to `docs/superpowers/plans/2026-04-24-claude-limits.md`. Two execution options:
 
 **1. Subagent-Driven (recommended)** — dispatch a fresh subagent per task with two-stage review. Fast iteration, clean isolation. Use `superpowers:subagent-driven-development`.
 

@@ -18,23 +18,23 @@ You are taking over an in-progress project. Your job: execute the implementation
 Read in this order — each builds on the previous:
 
 1. **The project brief (design context):**
-   `/Users/feixu/Developer/open Source/claude-usage-monitor/CLAUDE.md`
+   `/Users/feixu/Developer/open Source/claude-limits/CLAUDE.md`
 
 2. **The design spec (what we're building and why):**
-   `/Users/feixu/Developer/open Source/claude-usage-monitor/docs/superpowers/specs/2026-04-24-claude-usage-monitor-design.md`
+   `/Users/feixu/Developer/open Source/claude-limits/docs/superpowers/specs/2026-04-24-claude-limits-design.md`
 
 3. **The implementation plan (your main instructions — 15 phases, 37 tasks, 196 steps):**
-   `/Users/feixu/Developer/open Source/claude-usage-monitor/docs/superpowers/plans/2026-04-24-claude-usage-monitor.md`
+   `/Users/feixu/Developer/open Source/claude-limits/docs/superpowers/plans/2026-04-24-claude-limits.md`
 
 4. **The design system reference (UI conventions to follow):**
-   `/Users/feixu/Developer/open Source/claude-usage-monitor/docs/design-system.md`
+   `/Users/feixu/Developer/open Source/claude-limits/docs/design-system.md`
 
 Also skim `docs/spec-review.md` — it lists the factual issues we already fixed in spec revision 2 and plan revision 2. Don't relitigate them.
 
 ## Step 2: Inspect the current project state
 
 ```bash
-cd "/Users/feixu/Developer/open Source/claude-usage-monitor"
+cd "/Users/feixu/Developer/open Source/claude-limits"
 ls -la
 find src -type f | sort
 ls src-tauri 2>/dev/null || echo "NO src-tauri YET"
@@ -131,7 +131,7 @@ Handle this explicitly per task: run `cat src/popover/CompactPopover.tsx` etc. *
 
 **Specific things to reconcile:**
 
-- **Tab count:** spec v2 says 4 tabs (Sessions, Models with Cache folded in, Trends with 30-day strip, Projects); designer delivered 6 (adds Heatmap, Cache). Either is acceptable — prefer whichever looks more polished in the delivered code. Commit the decision. If keeping 6, update `docs/superpowers/specs/2026-04-24-claude-usage-monitor-design.md` §1 non-goals list to drop the Heatmap/Cache deferrals.
+- **Tab count:** spec v2 says 4 tabs (Sessions, Models with Cache folded in, Trends with 30-day strip, Projects); designer delivered 6 (adds Heatmap, Cache). Either is acceptable — prefer whichever looks more polished in the delivered code. Commit the decision. If keeping 6, update `docs/superpowers/specs/2026-04-24-claude-limits-design.md` §1 non-goals list to drop the Heatmap/Cache deferrals.
 - **`src/lib/types.ts`:** the plan's Task 7.3 deletes this in favor of generated bindings. The designer created one. The plan's intent stands: run Task 7.3 to generate bindings, then delete the hand-written file. Do not skip Task 7.3.
 - **`src/lib/store.ts`:** designer created a UI-theme store. Task 7.2 augments it with usage/settings/auth state. Check what's already there and **merge** rather than replace.
 - **`src/lib/format.ts`:** designer added this as a post-critique fix. It's not in the plan. Keep it; it may be reused by the reporting tabs.

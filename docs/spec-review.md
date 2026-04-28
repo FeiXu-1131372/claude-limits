@@ -1,4 +1,4 @@
-# Spec Review — Claude Usage Monitor (2026-04-24)
+# Spec Review — Claude Limits (2026-04-24)
 
 **Reviewer stance:** Adversarial — find problems before implementation burns time.
 **Verdict ordering:** Critical issues block implementation. Recommended changes improve the plan. Nice-to-haves are optional. Risks-accepted are called out so nothing is "ambushed" later.
