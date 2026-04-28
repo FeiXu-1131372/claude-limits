@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { CompactPopover } from './popover/CompactPopover';
 import { ExpandedReport } from './report/ExpandedReport';
 import { AuthPanel } from './settings/AuthPanel';
@@ -12,21 +11,19 @@ export function App() {
   const init = useAppStore((s) => s.init);
   const authRequired = useAppStore((s) => s.authRequired);
   const conflict = useAppStore((s) => s.conflict);
+  const viewMode = useAppStore((s) => s.viewMode);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     init().finally(() => setInitialized(true));
   }, [init]);
 
-  const label = getCurrentWindow().label;
-
-  // Tag the body so CSS can render the popover with a transparent backdrop
-  // (so OS vibrancy shows through) while opaque windows like the report keep
-  // a solid surface.
+  // Tag the body so CSS can differentiate compact (transparent vibrancy)
+  // from expanded (solid opaque background).
   useEffect(() => {
-    document.body.dataset.window = label;
-    return () => { delete document.body.dataset.window; };
-  }, [label]);
+    document.body.dataset.viewMode = viewMode;
+    return () => { delete document.body.dataset.viewMode; };
+  }, [viewMode]);
 
   if (!initialized) {
     return (
@@ -48,7 +45,7 @@ export function App() {
     return <AuthPanel />;
   }
 
-  if (label === 'report') {
+  if (viewMode === 'expanded') {
     return <ExpandedReport />;
   }
 

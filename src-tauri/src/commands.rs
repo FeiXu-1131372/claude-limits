@@ -281,11 +281,23 @@ pub async fn debug_force_threshold(
 
 #[command]
 #[specta::specta]
-pub async fn open_expanded_window(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn resize_window(mode: String, app: tauri::AppHandle) -> Result<(), String> {
     use tauri::Manager;
-    if let Some(w) = app.get_webview_window("report") {
-        let _ = w.show();
-        let _ = w.set_focus();
+    if let Some(w) = app.get_webview_window("popover") {
+        match mode.as_str() {
+            "compact" => {
+                let _ = w.set_always_on_top(true);
+                let _ = w.set_resizable(false);
+                let _ = w.set_size(tauri::Size::Logical(tauri::LogicalSize::new(360.0, 380.0)));
+            }
+            "expanded" => {
+                let _ = w.set_resizable(true);
+                let _ = w.set_always_on_top(false);
+                let _ = w.set_size(tauri::Size::Logical(tauri::LogicalSize::new(960.0, 640.0)));
+                let _ = w.center();
+            }
+            _ => {}
+        }
     }
     Ok(())
 }

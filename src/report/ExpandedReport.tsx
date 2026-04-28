@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { IconButton } from '../components/ui/IconButton';
+import { UsageSummary } from '../components/UsageSummary';
 import { SessionsTab } from './SessionsTab';
 import { ModelsTab } from './ModelsTab';
 import { TrendsTab } from './TrendsTab';
@@ -10,7 +11,8 @@ import { CacheTab } from './CacheTab';
 import { useAppStore } from '../lib/store';
 import { ipc } from '../lib/ipc';
 import { tabSlide } from '../lib/motion';
-import { IconRefresh } from '../lib/icons';
+import { IconRefresh, IconCollapse, X } from '../lib/icons';
+import { handleDragStart, closeWindow } from '../lib/window-chrome';
 
 const TAB_CONFIG = [
   { id: 'sessions', label: 'Sessions' },
@@ -35,8 +37,14 @@ export function ExpandedReport() {
   const [refreshing, setRefreshing] = useState(false);
   const [tabKey, setTabKey] = useState(0);
   const stale = useAppStore((s) => s.stale);
+  const usage = useAppStore((s) => s.usage);
+  const thresholds = useAppStore((s) => s.settings?.thresholds ?? [75, 90]);
+  const toggleViewMode = useAppStore((s) => s.toggleViewMode);
 
   const TabComponent = TAB_COMPONENTS[activeTab] ?? SessionsTab;
+
+  const warn = thresholds[0] ?? 75;
+  const danger = thresholds[1] ?? 90;
 
   async function handleRefresh() {
     if (refreshing) return;
@@ -51,44 +59,60 @@ export function ExpandedReport() {
 
   return (
     <div
-      className="flex h-full flex-col overflow-hidden border border-[var(--color-border-subtle)]"
+      className="flex h-full flex-col overflow-hidden"
       style={{
-        width: 'var(--report-width)',
+        width: '100%',
         minHeight: 'var(--report-min-height)',
         background: 'var(--color-bg-base)',
-        borderRadius: 'var(--radius-lg)',
       }}
     >
       {/* Header — generous padding, brand-warm tinted strip with hairline below */}
       <header
+        onPointerDown={handleDragStart}
         className="
           relative flex items-center justify-between gap-[var(--space-md)]
           px-[var(--space-2xl)] pt-[var(--space-xl)] pb-[var(--space-lg)]
-          shrink-0
+          shrink-0 cursor-default select-none
         "
       >
-        <div className="flex items-baseline gap-[var(--space-md)]">
-          <span className="text-[length:var(--text-title)] font-[var(--weight-semibold)] tracking-[-0.01em] text-[color:var(--color-text)]">
-            Claude Usage
+        <div className="flex items-center gap-[var(--space-xs)] pointer-events-none">
+          <span className="text-[length:var(--text-label)] font-[var(--weight-semibold)] text-[color:var(--color-text-secondary)] tracking-[var(--tracking-label)] uppercase">
+            Claude
           </span>
           <span className="text-[length:var(--text-label)] tracking-[var(--tracking-label)] uppercase text-[color:var(--color-text-muted)]">
-            {stale ? 'Stale' : 'Live'} · last 30 days
+            · {stale ? 'Stale' : 'Live'} · last 30 days
           </span>
         </div>
-        <IconButton label="Refresh" onClick={handleRefresh}>
-          <motion.span
-            animate={refreshing ? { rotate: 360 } : { rotate: 0 }}
-            transition={
-              refreshing
-                ? { duration: 0.7, ease: 'linear', repeat: Infinity }
-                : { duration: 0.2 }
-            }
-            style={{ display: 'inline-flex' }}
-          >
-            <IconRefresh size={14} />
-          </motion.span>
-        </IconButton>
+        <div className="flex items-center gap-[2px]">
+          <IconButton label="Refresh" onClick={handleRefresh}>
+            <motion.span
+              animate={refreshing ? { rotate: 360 } : { rotate: 0 }}
+              transition={
+                refreshing
+                  ? { duration: 0.7, ease: 'linear', repeat: Infinity }
+                  : { duration: 0.2 }
+              }
+              style={{ display: 'inline-flex' }}
+            >
+              <IconRefresh size={13} />
+            </motion.span>
+          </IconButton>
+          <IconButton label="Collapse details" onClick={toggleViewMode}>
+            <IconCollapse size={13} />
+          </IconButton>
+          <IconButton label="Close" onClick={closeWindow}>
+            <X size={13} />
+          </IconButton>
+        </div>
       </header>
+
+      {/* Condensed usage summary — compact readout at the top of expanded view */}
+      {usage && (
+        <>
+          <UsageSummary usage={usage} thresholds={[warn, danger]} condensed />
+          <div className="mx-[var(--space-2xl)] border-t border-[var(--color-rule)]" />
+        </>
+      )}
 
       {/* Tab bar — text-only, with a single sliding underline indicator */}
       <TabBar

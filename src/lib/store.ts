@@ -17,6 +17,8 @@ interface AppStore {
   // as Claude Code writes new turns; without it, the report shows the snapshot
   // from when the tab first mounted and only updates on manual reload.
   sessionDataVersion: number;
+  /** Current view mode — compact popover or expanded report, same window. */
+  viewMode: 'compact' | 'expanded';
 
   init: () => Promise<void>;
   refreshSettings: () => Promise<void>;
@@ -24,6 +26,7 @@ interface AppStore {
   refreshUsage: () => Promise<void>;
   signOut: () => Promise<void>;
   dismissBanner: (kind: 'authRequired' | 'stale' | 'dbReset' | 'conflict') => void;
+  toggleViewMode: () => void;
 }
 
 export const useAppStore = create<AppStore>((set, _get) => ({
@@ -35,6 +38,7 @@ export const useAppStore = create<AppStore>((set, _get) => ({
   stale: false,
   dbReset: false,
   sessionDataVersion: 0,
+  viewMode: 'compact',
 
   async init() {
     const [usage, settings, hasClaudeCodeCreds] = await Promise.all([
@@ -124,5 +128,11 @@ export const useAppStore = create<AppStore>((set, _get) => ({
         set({ conflict: null });
         break;
     }
+  },
+
+  toggleViewMode() {
+    const next = _get().viewMode === 'compact' ? 'expanded' : 'compact';
+    set({ viewMode: next });
+    ipc.resizeWindow(next).catch(() => {});
   },
 }));

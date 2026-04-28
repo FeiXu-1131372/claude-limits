@@ -58,7 +58,7 @@ pub fn run() {
             commands::has_claude_code_creds,
             commands::update_settings,
             commands::get_settings,
-            commands::open_expanded_window,
+            commands::resize_window,
             commands::force_refresh,
         ]);
 
@@ -79,7 +79,7 @@ pub fn run() {
             commands::has_claude_code_creds,
             commands::update_settings,
             commands::get_settings,
-            commands::open_expanded_window,
+            commands::resize_window,
             commands::force_refresh,
             commands::debug_force_threshold,
         ]);
@@ -111,22 +111,6 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .plugin(
-            // Track the report window's size/position/maximized so users keep
-            // their preferred layout, but never restore visibility — the report
-            // must stay hidden on cold start and only appear when the user
-            // clicks "See details". The popover is a fixed 360×360 widget,
-            // so don't track it at all.
-            tauri_plugin_window_state::Builder::default()
-                .with_state_flags(
-                    tauri_plugin_window_state::StateFlags::SIZE
-                        | tauri_plugin_window_state::StateFlags::POSITION
-                        | tauri_plugin_window_state::StateFlags::MAXIMIZED
-                        | tauri_plugin_window_state::StateFlags::DECORATIONS,
-                )
-                .with_denylist(&["popover"])
-                .build(),
-        )
         .invoke_handler(specta_builder.invoke_handler())
         .setup(|app| {
             use tauri::Manager;
@@ -144,30 +128,19 @@ pub fn run() {
             }
 
             // Force the popover to its configured fixed size on every launch.
-            // The window-state denylist already keeps it untracked, but a
-            // historical save from a previous build can still leave it
-            // oversized on first run after the upgrade.
             if let Some(popover) = app.get_webview_window("popover") {
                 use tauri::{LogicalSize, Size};
                 let _ = popover.set_size(Size::Logical(LogicalSize::new(360.0, 380.0)));
-            }
 
-            // Always start with the report window hidden — the user opens it
-            // explicitly via the tray menu or the "See details" button. This
-            // guards against any plugin / OS path that might otherwise leave
-            // it visible from a previous session.
-            //
-            // Also intercept the OS close button: by default Tauri DESTROYS the
-            // window, after which get_webview_window("report") returns None and
-            // open_expanded_window silently no-ops — the user can never reopen
-            // the report. Hide instead so the window survives for next show().
-            if let Some(report) = app.get_webview_window("report") {
-                let _ = report.hide();
-                let report_clone = report.clone();
-                report.on_window_event(move |ev| {
+                // Intercept the OS close button: by default Tauri DESTROYS the
+                // window, after which get_webview_window("popover") returns None
+                // and the app can never reopen. Hide instead so the window
+                // survives for next show().
+                let popover_clone = popover.clone();
+                popover.on_window_event(move |ev| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = ev {
                         api.prevent_close();
-                        let _ = report_clone.hide();
+                        let _ = popover_clone.hide();
                     }
                 });
             }
@@ -207,10 +180,9 @@ pub fn run() {
             use tauri::menu::{MenuBuilder, MenuItem};
             use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
 
-            let show = MenuItem::with_id(app, "show", "Show popover", true, None::<&str>)?;
-            let expand = MenuItem::with_id(app, "expand", "Open expanded report", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = MenuBuilder::new(app).items(&[&show, &expand, &quit]).build()?;
+            let menu = MenuBuilder::new(app).items(&[&show, &quit]).build()?;
 
             if let Some(tray) = app.tray_by_id("main") {
                 tracing::info!("attaching menu + handlers to config-created tray");
@@ -218,12 +190,6 @@ pub fn run() {
                 tray.on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(w) = app.get_webview_window("popover") {
-                            let _ = w.show();
-                            let _ = w.set_focus();
-                        }
-                    }
-                    "expand" => {
-                        if let Some(w) = app.get_webview_window("report") {
                             let _ = w.show();
                             let _ = w.set_focus();
                         }

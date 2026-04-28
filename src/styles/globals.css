@@ -35,11 +35,11 @@ body {
   line-height: var(--leading-body);
 }
 
-/* The popover is a transparent, vibrancy-backed Tauri window. Letting the body
- * paint a solid color would cover the native blur, so we explicitly opt that
- * one window out. Other windows (like the report) keep the opaque base. */
-body[data-window="popover"],
-html:has(body[data-window="popover"]) {
+/* The compact popover is a transparent, vibrancy-backed Tauri window. Letting
+ * the body paint a solid color would cover the native blur, so we explicitly
+ * opt that mode out. The expanded view keeps the opaque base. */
+body[data-view-mode="compact"],
+html:has(body[data-view-mode="compact"]) {
   background: transparent;
 }
 
@@ -47,7 +47,7 @@ html:has(body[data-window="popover"]) {
   height: 100vh;
 }
 
-body[data-window="popover"] #root {
+body[data-view-mode="compact"] #root {
   /* Round the popover content so it reads as a Control-Center / Raycast-style
    * widget rather than a square panel. Native vibrancy clips to this radius.
    *

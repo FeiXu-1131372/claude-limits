@@ -36,6 +36,7 @@ export const ipc = {
   updateSettings: (s: Settings) =>
     invoke<void>("update_settings", { s }),
 
-  openExpandedWindow: () => invoke<void>("open_expanded_window"),
+  resizeWindow: (mode: 'compact' | 'expanded') =>
+    invoke<void>('resize_window', { mode }),
   forceRefresh: () => invoke<void>("force_refresh"),
 };

@@ -12,7 +12,7 @@
     "windows": [
       {
         "label": "popover",
-        "title": "",
+        "title": "Claude Limits",
         "width": 360,
         "height": 380,
         "resizable": false,
@@ -21,16 +21,6 @@
         "alwaysOnTop": true,
         "visible": false,
         "skipTaskbar": true
-      },
-      {
-        "label": "report",
-        "title": "Claude Limits",
-        "width": 960,
-        "height": 640,
-        "minWidth": 800,
-        "minHeight": 560,
-        "resizable": true,
-        "visible": false
       }
     ],
     "trayIcon": {

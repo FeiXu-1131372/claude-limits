@@ -20,6 +20,8 @@ export {
   Key,
   LayoutGrid,
   LogOut,
+  Maximize2,
+  Minimize2,
   Monitor,
   Moon,
   RefreshCw,
@@ -44,6 +46,8 @@ export { Flame as IconUsage } from 'lucide-react';
 export { Gauge as IconThreshold } from 'lucide-react';
 export { Key as IconAuth } from 'lucide-react';
 export { LayoutGrid as IconSessions } from 'lucide-react';
+export { Maximize2 as IconExpand } from 'lucide-react';
+export { Minimize2 as IconCollapse } from 'lucide-react';
 export { RefreshCw as IconRefresh } from 'lucide-react';
 export { Settings as IconSettings } from 'lucide-react';
 export { TrendingUp as IconTrends } from 'lucide-react';

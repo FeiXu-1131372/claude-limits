@@ -166,7 +166,12 @@
 
   /* Window dimensions */
   --popover-width: 360px;
-  --popover-height: 320px;
+  --popover-height: 380px;
+
+  /* Report (expanded mode) dimensions — the window resizes dynamically so
+   * width is 100%. Min-height prevents a squished layout if the user shrinks. */
+  --report-width: 100%;
+  --report-min-height: 560px;
 
   /* Progress bar heights */
   --bar-hairline: 2px;
