@@ -1,7 +1,10 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::Path;
 
+/// Canonical post-parsed event used by the walker and downstream code.
+/// `cost_usd` starts at 0.0 and is computed by the walker via the pricing table.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SessionEvent {
     pub ts: DateTime<Utc>,
@@ -22,6 +25,267 @@ pub struct SessionEvent {
     #[serde(default)]
     pub cost_usd: f64,
 
+    /// Stable per-API-call key, "{requestId}:{message.id}" when both fields
+    /// were present on the JSONL line. None for older Claude Code formats
+    /// that didn't write requestId — the walker substitutes a structural
+    /// "{source_file}:{source_line}" fallback in that case.
+    #[serde(default)]
+    pub event_id: Option<String>,
+
     #[serde(flatten, default)]
     pub unknown: HashMap<String, serde_json::Value>,
+}
+
+/// Raw shape of one JSONL line as Claude Code writes it. Many line types
+/// (`user`, `permission-mode`, `attachment`, `system`, `last-prompt`, etc.)
+/// share this envelope but only `assistant` lines carry the usage payload
+/// we care about.
+#[derive(Debug, Deserialize)]
+struct ClaudeCodeRecord {
+    #[serde(rename = "type")]
+    record_type: String,
+    timestamp: DateTime<Utc>,
+    #[serde(default)]
+    cwd: Option<String>,
+    #[serde(default, rename = "requestId")]
+    request_id: Option<String>,
+    message: Option<ClaudeMessage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ClaudeMessage {
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    model: Option<String>,
+    #[serde(default)]
+    usage: Option<ClaudeUsage>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ClaudeUsage {
+    #[serde(default)]
+    input_tokens: u64,
+    #[serde(default)]
+    output_tokens: u64,
+    #[serde(default)]
+    cache_read_input_tokens: u64,
+    #[serde(default)]
+    cache_creation_input_tokens: u64,
+    #[serde(default)]
+    cache_creation: Option<CacheCreationDetails>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct CacheCreationDetails {
+    #[serde(default)]
+    ephemeral_5m_input_tokens: u64,
+    #[serde(default)]
+    ephemeral_1h_input_tokens: u64,
+}
+
+/// Parses one JSONL line and returns a `SessionEvent` if the line is an
+/// assistant message carrying token usage. All other line types and any
+/// malformed records return `None`.
+///
+/// `fallback_project` is used when the record lacks `cwd` (rare); it should
+/// be the JSONL file's parent directory name, which Claude Code derives from
+/// the originating cwd anyway.
+pub fn parse_event_line(line: &str, fallback_project: &str) -> Option<SessionEvent> {
+    let rec: ClaudeCodeRecord = serde_json::from_str(line).ok()?;
+    if rec.record_type != "assistant" {
+        return None;
+    }
+    let msg = rec.message?;
+    let model = msg.model.clone()?;
+    // No usage block → not a usage-bearing message (could be a continuation
+    // or partial). Skip silently.
+    let usage = msg.usage?;
+
+    // Build the dedup key from Claude's stable identifiers when both are
+    // present. ccusage uses the same combination — neither field alone is
+    // unique enough across retries.
+    let event_id = match (rec.request_id.as_deref(), msg.id.as_deref()) {
+        (Some(req), Some(mid)) if !req.is_empty() && !mid.is_empty() => {
+            Some(format!("{req}:{mid}"))
+        }
+        _ => None,
+    };
+
+    let project = rec
+        .cwd
+        .as_deref()
+        .and_then(|c| {
+            Path::new(c)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|s| s.to_string())
+        })
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| fallback_project.to_string());
+
+    // Prefer the structured per-bucket split. When older records carry only the
+    // flat cache_creation_input_tokens, attribute it to the 5m bucket — that's
+    // Anthropic's default TTL, so it's the correct guess and avoids the 1.6×
+    // over-billing that 1h pricing would impose.
+    let (cache_5m, cache_1h) = match usage.cache_creation.as_ref() {
+        Some(c) => (c.ephemeral_5m_input_tokens, c.ephemeral_1h_input_tokens),
+        None => (usage.cache_creation_input_tokens, 0),
+    };
+
+    Some(SessionEvent {
+        ts: rec.timestamp,
+        project,
+        model,
+        input_tokens: usage.input_tokens,
+        output_tokens: usage.output_tokens,
+        cache_read_tokens: usage.cache_read_input_tokens,
+        cache_creation_5m_tokens: cache_5m,
+        cache_creation_1h_tokens: cache_1h,
+        cost_usd: 0.0,
+        event_id,
+        unknown: HashMap::new(),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const ASSISTANT_LINE: &str = r#"{
+      "parentUuid": "abc",
+      "isSidechain": false,
+      "type": "assistant",
+      "timestamp": "2026-04-26T03:59:37.845Z",
+      "cwd": "/Users/feixu/Developer/my-project",
+      "sessionId": "abc-123",
+      "message": {
+        "model": "claude-opus-4-7",
+        "role": "assistant",
+        "usage": {
+          "input_tokens": 6,
+          "output_tokens": 280,
+          "cache_read_input_tokens": 19006,
+          "cache_creation_input_tokens": 19452,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 19452
+          }
+        }
+      }
+    }"#;
+
+    const USER_LINE: &str = r#"{
+      "type": "user",
+      "timestamp": "2026-04-26T03:59:00.000Z",
+      "message": {"role": "user"}
+    }"#;
+
+    const PERMISSION_LINE: &str = r#"{
+      "type": "permission-mode",
+      "timestamp": "2026-04-26T03:59:00.000Z"
+    }"#;
+
+    #[test]
+    fn parses_assistant_line() {
+        let ev = parse_event_line(ASSISTANT_LINE, "fallback").expect("should parse");
+        assert_eq!(ev.model, "claude-opus-4-7");
+        assert_eq!(ev.project, "my-project");
+        assert_eq!(ev.input_tokens, 6);
+        assert_eq!(ev.output_tokens, 280);
+        assert_eq!(ev.cache_read_tokens, 19006);
+        assert_eq!(ev.cache_creation_5m_tokens, 0);
+        assert_eq!(ev.cache_creation_1h_tokens, 19452);
+        assert_eq!(ev.cost_usd, 0.0);
+    }
+
+    #[test]
+    fn skips_non_assistant_types() {
+        assert!(parse_event_line(USER_LINE, "fallback").is_none());
+        assert!(parse_event_line(PERMISSION_LINE, "fallback").is_none());
+    }
+
+    #[test]
+    fn skips_malformed_json() {
+        assert!(parse_event_line("not json", "fallback").is_none());
+        assert!(parse_event_line("{}", "fallback").is_none());
+    }
+
+    #[test]
+    fn falls_back_when_cwd_absent() {
+        let line = r#"{
+          "type": "assistant",
+          "timestamp": "2026-04-26T03:59:37.845Z",
+          "message": {
+            "model": "claude-haiku-4-5",
+            "usage": {"input_tokens": 1, "output_tokens": 1}
+          }
+        }"#;
+        let ev = parse_event_line(line, "-Users-feixu").expect("should parse");
+        assert_eq!(ev.project, "-Users-feixu");
+    }
+
+    #[test]
+    fn event_id_uses_request_id_and_message_id_when_both_present() {
+        let line = r#"{
+          "type": "assistant",
+          "timestamp": "2026-04-26T03:59:37.845Z",
+          "cwd": "/x/y",
+          "requestId": "req_abc",
+          "message": {
+            "id": "msg_xyz",
+            "model": "claude-sonnet-4-6",
+            "usage": {"input_tokens": 1, "output_tokens": 1}
+          }
+        }"#;
+        let ev = parse_event_line(line, "fb").expect("should parse");
+        assert_eq!(ev.event_id.as_deref(), Some("req_abc:msg_xyz"));
+    }
+
+    #[test]
+    fn event_id_is_none_when_request_id_or_message_id_missing() {
+        let no_request_id = r#"{
+          "type": "assistant",
+          "timestamp": "2026-04-26T03:59:37.845Z",
+          "cwd": "/x/y",
+          "message": {
+            "id": "msg_xyz",
+            "model": "claude-sonnet-4-6",
+            "usage": {"input_tokens": 1, "output_tokens": 1}
+          }
+        }"#;
+        assert!(parse_event_line(no_request_id, "fb").unwrap().event_id.is_none());
+
+        let no_message_id = r#"{
+          "type": "assistant",
+          "timestamp": "2026-04-26T03:59:37.845Z",
+          "cwd": "/x/y",
+          "requestId": "req_abc",
+          "message": {
+            "model": "claude-sonnet-4-6",
+            "usage": {"input_tokens": 1, "output_tokens": 1}
+          }
+        }"#;
+        assert!(parse_event_line(no_message_id, "fb").unwrap().event_id.is_none());
+    }
+
+    #[test]
+    fn flat_cache_creation_field_used_when_no_split() {
+        let line = r#"{
+          "type": "assistant",
+          "timestamp": "2026-04-26T03:59:37.845Z",
+          "cwd": "/x/y",
+          "message": {
+            "model": "claude-sonnet-4-6",
+            "usage": {
+              "input_tokens": 10,
+              "output_tokens": 20,
+              "cache_creation_input_tokens": 500
+            }
+          }
+        }"#;
+        let ev = parse_event_line(line, "fb").expect("should parse");
+        assert_eq!(ev.cache_creation_5m_tokens, 500);
+        assert_eq!(ev.cache_creation_1h_tokens, 0);
+    }
 }

@@ -1,4 +1,4 @@
-use super::record::SessionEvent;
+use super::record::parse_event_line;
 use super::pricing::PricingTable;
 use crate::store::{Db, StoredSessionEvent};
 use anyhow::{Context, Result};
@@ -104,57 +104,42 @@ pub fn ingest_file(db: &Db, pricing: &PricingTable, path: &Path) -> Result<usize
         if text.is_empty() {
             continue;
         }
-        match serde_json::from_str::<SessionEvent>(text) {
-            Ok(ev) => {
-                let cost = if ev.cost_usd > 0.0 {
-                    ev.cost_usd
-                } else {
-                    pricing.cost_for(
-                        &ev.model,
-                        ev.input_tokens,
-                        ev.output_tokens,
-                        ev.cache_read_tokens,
-                        ev.cache_creation_5m_tokens,
-                        ev.cache_creation_1h_tokens,
-                    )
-                };
-                let project_name = if ev.project.is_empty() {
-                    project.clone()
-                } else {
-                    ev.project.clone()
-                };
-                stored.push(StoredSessionEvent {
-                    ts: ev.ts,
-                    project: project_name,
-                    model: ev.model,
-                    input_tokens: ev.input_tokens,
-                    output_tokens: ev.output_tokens,
-                    cache_read_tokens: ev.cache_read_tokens,
-                    cache_creation_5m_tokens: ev.cache_creation_5m_tokens,
-                    cache_creation_1h_tokens: ev.cache_creation_1h_tokens,
-                    cost_usd: cost,
-                    source_file: key.clone(),
-                    source_line: line_start,
-                });
-            }
-            Err(e) => {
-                // Claude Code JSONLs interleave many non-event record types
-                // (summaries, system pings, tool meta) that legitimately lack
-                // the required ts/project/model fields. Those aren't bugs — log
-                // at debug. Real malformed JSON (where serde can't parse the
-                // outer object) gets a single warn so it's still visible.
-                if e.is_data() {
-                    tracing::debug!(
-                        "skipping non-event line in {} at offset {}: {}",
-                        key, line_start, e
-                    );
-                } else {
-                    tracing::warn!(
-                        "malformed JSON in {} at offset {}: {}",
-                        key, line_start, e
-                    );
-                }
-            }
+        // Claude Code JSONLs interleave many non-usage record types
+        // (`user`, `permission-mode`, `attachment`, `system`, `last-prompt`, …);
+        // only `assistant` lines carry a `message.usage` payload. parse_event_line
+        // returns None for everything else, so silent skip is correct here.
+        if let Some(ev) = parse_event_line(text, &project) {
+            let cost = pricing.cost_for(
+                &ev.model,
+                ev.input_tokens,
+                ev.output_tokens,
+                ev.cache_read_tokens,
+                ev.cache_creation_5m_tokens,
+                ev.cache_creation_1h_tokens,
+            );
+            // Structural fallback only when the JSONL line lacked the
+            // canonical Claude identifiers (older Claude Code versions or
+            // hand-written test fixtures). For modern Claude Code, this
+            // path isn't taken — the parser produces a real
+            // "{requestId}:{message.id}" key that survives Claude Code
+            // re-writing the same usage block to multiple offsets.
+            let event_id = ev
+                .event_id
+                .unwrap_or_else(|| format!("{}:{}", key, line_start));
+            stored.push(StoredSessionEvent {
+                ts: ev.ts,
+                project: ev.project,
+                model: ev.model,
+                input_tokens: ev.input_tokens,
+                output_tokens: ev.output_tokens,
+                cache_read_tokens: ev.cache_read_tokens,
+                cache_creation_5m_tokens: ev.cache_creation_5m_tokens,
+                cache_creation_1h_tokens: ev.cache_creation_1h_tokens,
+                cost_usd: cost,
+                source_file: key.clone(),
+                source_line: line_start,
+                event_id,
+            });
         }
     }
     let inserted = db.insert_events(&stored)?;

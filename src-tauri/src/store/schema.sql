@@ -1,4 +1,4 @@
--- v1 schema
+-- v2 schema (see store/migrations/ for upgrades from older versions).
 PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
 PRAGMA synchronous = NORMAL;
@@ -37,7 +37,15 @@ CREATE TABLE IF NOT EXISTS session_events (
     cost_usd REAL NOT NULL DEFAULT 0,
     source_file TEXT NOT NULL,
     source_line INTEGER NOT NULL,
-    UNIQUE (source_file, source_line)
+    -- Stable per-Claude-API-call identifier. Prefer "{requestId}:{message.id}"
+    -- when both are present in the JSONL (modern Claude Code); fall back to
+    -- "{source_file}:{source_line}" for older formats. The UNIQUE constraint
+    -- here is what dedupes the same response written to multiple offsets in
+    -- the same file (Claude Code does this on retries / partial rewinds —
+    -- the (source_file, source_line) constraint we used in v1 missed it,
+    -- inflating cost on busy days by 40%+).
+    event_id TEXT NOT NULL,
+    UNIQUE (event_id)
 );
 CREATE INDEX IF NOT EXISTS idx_events_ts ON session_events(ts DESC);
 CREATE INDEX IF NOT EXISTS idx_events_project ON session_events(project);

@@ -21,22 +21,37 @@ impl Db {
 
         let db_path = dir.join("data.db");
         let conn = Connection::open(&db_path).context("open sqlite")?;
+        // schema.sql holds the *current* shape (v2). For a fresh DB this
+        // creates everything; for an existing v1 DB it's a no-op (CREATE
+        // TABLE IF NOT EXISTS) and the migration block below brings it
+        // forward.
         conn.execute_batch(include_str!("schema.sql"))
             .context("apply schema")?;
 
         let mut db = Db { conn: Mutex::new(conn), _lock: lock_file };
-        db.ensure_version(1)?;
+        db.migrate()?;
         Ok(db)
     }
 
-    fn ensure_version(&mut self, target: i64) -> Result<()> {
+    /// Brings the DB up to the current schema version. Each block is
+    /// idempotent (guarded by the schema_version row) so it's safe to run
+    /// on fresh DBs too.
+    fn migrate(&mut self) -> Result<()> {
         let conn = self.conn.get_mut().unwrap();
         let current: i64 = conn
             .query_row("SELECT COALESCE(MAX(version), 0) FROM schema_version", [], |r| r.get(0))
             .unwrap_or(0);
-        if current < target {
-            conn.execute("INSERT OR REPLACE INTO schema_version (version) VALUES (?1)", [target])?;
+
+        if current < 2 {
+            tracing::info!("migrating session_events schema v1 -> v2 (event_id dedup)");
+            conn.execute_batch(include_str!("migrations/0002_event_id_dedup.sql"))
+                .context("apply migration 0002")?;
         }
+
+        conn.execute(
+            "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+            [2_i64],
+        )?;
         Ok(())
     }
 

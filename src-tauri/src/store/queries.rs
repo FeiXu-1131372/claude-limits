@@ -25,6 +25,10 @@ pub struct StoredSessionEvent {
     pub cost_usd: f64,
     pub source_file: String,
     pub source_line: i64,
+    /// Stable per-API-call key used for dedup. Format: "{requestId}:{message.id}"
+    /// when both are present in the JSONL line, else "{source_file}:{source_line}"
+    /// as a structural fallback for older / pre-requestId schemas.
+    pub event_id: String,
 }
 
 impl Db {
@@ -81,8 +85,9 @@ impl Db {
             let mut stmt = tx.prepare(
                 "INSERT OR IGNORE INTO session_events
                 (ts, project, model, input_tokens, output_tokens, cache_read_tokens,
-                 cache_creation_5m_tokens, cache_creation_1h_tokens, cost_usd, source_file, source_line)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                 cache_creation_5m_tokens, cache_creation_1h_tokens, cost_usd,
+                 source_file, source_line, event_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             )?;
             for e in events {
                 let n = stmt.execute(params![
@@ -96,7 +101,8 @@ impl Db {
                     e.cache_creation_1h_tokens as i64,
                     e.cost_usd,
                     e.source_file,
-                    e.source_line
+                    e.source_line,
+                    e.event_id,
                 ])?;
                 inserted += n;
             }
@@ -113,7 +119,8 @@ impl Db {
         let conn = self.conn();
         let mut stmt = conn.prepare(
             "SELECT ts, project, model, input_tokens, output_tokens, cache_read_tokens,
-                    cache_creation_5m_tokens, cache_creation_1h_tokens, cost_usd, source_file, source_line
+                    cache_creation_5m_tokens, cache_creation_1h_tokens, cost_usd,
+                    source_file, source_line, event_id
              FROM session_events WHERE ts BETWEEN ?1 AND ?2 ORDER BY ts DESC",
         )?;
         let rows = stmt.query_map(params![from.timestamp(), to.timestamp()], |r| {
@@ -129,6 +136,7 @@ impl Db {
                 cost_usd: r.get(8)?,
                 source_file: r.get(9)?,
                 source_line: r.get(10)?,
+                event_id: r.get(11)?,
             })
         })?;
         let mut out = Vec::new();
@@ -245,13 +253,39 @@ mod tests {
             cost_usd: 0.001,
             source_file: "f.jsonl".into(),
             source_line: 1,
+            event_id: "req_1:msg_1".into(),
         };
         assert_eq!(db.insert_events(std::slice::from_ref(&e)).unwrap(), 1);
         assert_eq!(
             db.insert_events(std::slice::from_ref(&e)).unwrap(),
             0,
-            "dedupe"
+            "same event_id is rejected"
         );
+    }
+
+    /// The exact regression that v1 missed: Claude Code can write the same
+    /// `message.usage` block to multiple offsets in the same file (retries,
+    /// partial rewinds). Different (source_file, source_line) but identical
+    /// event_id — must dedupe.
+    #[test]
+    fn dedupe_catches_same_event_at_different_offsets() {
+        let (_dir, db) = fresh_db();
+        let mk = |line: i64| StoredSessionEvent {
+            ts: Utc::now(),
+            project: "p".into(),
+            model: "opus-4-7".into(),
+            input_tokens: 6,
+            output_tokens: 332,
+            cache_read_tokens: 19099,
+            cache_creation_5m_tokens: 0,
+            cache_creation_1h_tokens: 396681,
+            cost_usd: 11.95,
+            source_file: "/Users/me/.claude/projects/p/abc.jsonl".into(),
+            source_line: line,
+            event_id: "req_abc:msg_xyz".into(),
+        };
+        // Same event written at offsets 100, 1000, 2000 — only the first lands.
+        assert_eq!(db.insert_events(&[mk(100), mk(1000), mk(2000)]).unwrap(), 1);
     }
 
     #[test]
@@ -284,7 +318,7 @@ mod tests {
         let (_dir, db) = fresh_db();
         let old = Utc::now() - chrono::Duration::days(200);
         let recent = Utc::now();
-        let mk = |ts, line| StoredSessionEvent {
+        let mk = |ts, line: i64| StoredSessionEvent {
             ts,
             project: "p".into(),
             model: "sonnet-4-6".into(),
@@ -296,6 +330,7 @@ mod tests {
             cost_usd: 0.0,
             source_file: "f.jsonl".into(),
             source_line: line,
+            event_id: format!("ev_{line}"),
         };
         db.insert_events(&[mk(old, 1), mk(recent, 2)]).unwrap();
         let cutoff = Utc::now() - chrono::Duration::days(90);
