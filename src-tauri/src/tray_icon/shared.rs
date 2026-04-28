@@ -17,12 +17,19 @@ pub fn danger() -> Color { Color::from_rgba8(0xD8, 0x5A, 0x45, 0xFF) }
 /// Track (faint backing ring) — mid gray with moderate alpha so it shows
 /// faintly on both menubar themes without overwhelming the colored arc.
 pub fn track() -> Color { Color::from_rgba8(0x88, 0x88, 0x88, 0x55) }
-/// Digit ink — near-black with high alpha. Reads cleanly on light menubars,
-/// and on dark menubars the dark digits sit inside the colored ring (which is
-/// the dominant visual signal anyway), so legibility is preserved.
+/// Digit ink — reads cleanly on light menubars (macOS) and dark taskbars (Windows).
+#[cfg(not(target_os = "windows"))]
 pub fn text() -> Color { Color::from_rgba8(0x1C, 0x1C, 0x1C, 0xF0) }
-/// Muted ink for the no-data em-dash. Same hue as digits, lighter.
+
+#[cfg(target_os = "windows")]
+pub fn text() -> Color { Color::from_rgba8(0xF0, 0xF0, 0xF0, 0xF0) }
+
+/// Muted ink for the no-data em-dash.
+#[cfg(not(target_os = "windows"))]
 pub fn text_muted() -> Color { Color::from_rgba8(0x6A, 0x6A, 0x6A, 0xC0) }
+
+#[cfg(target_os = "windows")]
+pub fn text_muted() -> Color { Color::from_rgba8(0xA0, 0xA0, 0xA0, 0xC0) }
 
 /// Returns the arc fill color for a single bucket's percentage.
 /// Mirrors the threshold logic the popover uses: <75 = accent, 75-89 = warn, >=90 = danger.
