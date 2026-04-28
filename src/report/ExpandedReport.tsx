@@ -209,7 +209,7 @@ function TabBar({
       {/* Sliding underline */}
       <motion.span
         aria-hidden
-        className="absolute bottom-0 h-[2px] rounded-full"
+        className="absolute bottom-0 left-0 h-[2px] rounded-full"
         style={{ background: 'var(--color-accent)' }}
         initial={false}
         animate={{ x: indicator.x, width: indicator.w }}
