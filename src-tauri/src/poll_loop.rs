@@ -306,4 +306,3 @@ mod tests {
         assert!((r.projected_at_reset - 80.0).abs() < 1e-6);
     }
 }
-

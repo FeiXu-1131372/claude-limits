@@ -5,9 +5,14 @@ import { formatCost } from '../lib/format';
 import { IconChart } from '../lib/icons';
 import { ipc } from '../lib/ipc';
 import { useTabData } from '../lib/useTabData';
+import { useAppStore } from '../lib/store';
 
 export function ProjectsTab() {
-  const { data, error, loading, reload } = useTabData(() => ipc.getProjectBreakdown(30));
+  const version = useAppStore((s) => s.sessionDataVersion);
+  const { data, error, loading, reload } = useTabData(
+    () => ipc.getProjectBreakdown(30),
+    [version],
+  );
 
   if (error) {
     return (

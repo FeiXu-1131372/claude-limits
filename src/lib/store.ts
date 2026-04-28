@@ -12,11 +12,17 @@ interface AppStore {
   conflict: { oauth_email: string; cli_email: string } | null;
   stale: boolean;
   dbReset: boolean;
+  // Bumped whenever the backend ingests new JSONL sessions. Tabs that derive
+  // their data from session history can subscribe to this so they auto-refresh
+  // as Claude Code writes new turns; without it, the report shows the snapshot
+  // from when the tab first mounted and only updates on manual reload.
+  sessionDataVersion: number;
 
   init: () => Promise<void>;
   refreshSettings: () => Promise<void>;
   setSettings: (s: Settings) => Promise<void>;
   refreshUsage: () => Promise<void>;
+  signOut: () => Promise<void>;
   dismissBanner: (kind: 'authRequired' | 'stale' | 'dbReset' | 'conflict') => void;
 }
 
@@ -28,6 +34,7 @@ export const useAppStore = create<AppStore>((set, _get) => ({
   conflict: null,
   stale: false,
   dbReset: false,
+  sessionDataVersion: 0,
 
   async init() {
     const [usage, settings, hasClaudeCodeCreds] = await Promise.all([
@@ -43,6 +50,7 @@ export const useAppStore = create<AppStore>((set, _get) => ({
           set({ usage: e.payload, authRequired: false, stale: false });
           break;
         case 'session_ingested':
+          set((s) => ({ sessionDataVersion: s.sessionDataVersion + 1 }));
           break;
         case 'auth_required':
           set({ authRequired: true });
@@ -90,6 +98,15 @@ export const useAppStore = create<AppStore>((set, _get) => ({
   async refreshUsage() {
     const u = await ipc.getCurrentUsage();
     if (u) set({ usage: u, stale: false });
+  },
+
+  async signOut() {
+    await ipc.signOut();
+    // Rust clears credentials and cached_usage but doesn't push an
+    // auth_required event for explicit sign-out. Update the store so
+    // App.tsx routes to AuthPanel and the user can pick an auth method.
+    const hasClaudeCodeCreds = await ipc.hasClaudeCodeCreds().catch(() => false);
+    set({ usage: null, authRequired: true, conflict: null, hasClaudeCodeCreds });
   },
 
   dismissBanner(kind) {

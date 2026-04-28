@@ -3,10 +3,12 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { motion } from 'framer-motion';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { IconButton } from '../components/ui/IconButton';
 import { fadeIn } from '../lib/motion';
-import { IconAuth, IconRefresh, ExternalLink } from '../lib/icons';
+import { IconAuth, IconRefresh, ExternalLink, X } from '../lib/icons';
 import { ipc } from '../lib/ipc';
 import { useAppStore } from '../lib/store';
+import { handleDragStart, closeWindow } from '../lib/window-chrome';
 
 type Step = 'choose' | 'waiting' | 'paste' | 'submitting';
 
@@ -71,7 +73,16 @@ export function AuthPanel() {
   }
 
   return (
-    <div className="flex items-center justify-center h-full p-[var(--space-2xl)]">
+    <div className="relative flex flex-col h-full">
+      <div
+        onPointerDown={handleDragStart}
+        className="flex items-center justify-end gap-[var(--space-sm)] px-[var(--popover-pad)] pt-[var(--space-md)] pb-[var(--space-sm)] cursor-default select-none"
+      >
+        <IconButton label="Close" onClick={closeWindow}>
+          <X size={13} />
+        </IconButton>
+      </div>
+    <div className="flex items-center justify-center flex-1 px-[var(--space-2xl)] pb-[var(--space-2xl)]">
       <motion.div
         className="flex flex-col gap-[var(--space-xl)] max-w-[280px]"
         variants={fadeIn}
@@ -207,6 +218,7 @@ export function AuthPanel() {
           Credentials are stored in your OS keychain and never leave this device.
         </p>
       </motion.div>
+    </div>
     </div>
   );
 }

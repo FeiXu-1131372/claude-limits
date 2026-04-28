@@ -56,12 +56,12 @@ body[data-window="popover"] #root {
    * through — over a bright/colorful background, muted text simply disappears.
    * The 0.86 alpha keeps a subtle hint of native blur showing through (so the
    * widget still reads as glass) while giving text a stable dark canvas to
-   * sit on. The two warm/teal radial washes add a light-source feel on top. */
+   * sit on. The two warm radial washes add a light-source feel on top. */
   border-radius: var(--radius-lg);
   overflow: hidden;
   background:
     radial-gradient(120% 80% at 0% 0%, oklch(72% 0.10 55 / 0.08), transparent 55%),
-    radial-gradient(120% 80% at 100% 100%, oklch(72% 0.13 180 / 0.05), transparent 55%),
+    radial-gradient(120% 80% at 100% 100%, oklch(67% 0.135 38 / 0.05), transparent 55%),
     oklch(20% 0.012 65 / 0.86);
 }
 

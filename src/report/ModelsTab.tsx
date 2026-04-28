@@ -7,6 +7,7 @@ import { formatTokens, formatCost } from '../lib/format';
 import { IconChart } from '../lib/icons';
 import { ipc } from '../lib/ipc';
 import { useTabData } from '../lib/useTabData';
+import { useAppStore } from '../lib/store';
 
 const MODEL_VARIANT: Record<string, 'opus' | 'sonnet' | 'haiku' | 'default'> = {
   opus: 'opus',
@@ -28,8 +29,10 @@ function shortName(model: string): string {
 }
 
 export function ModelsTab() {
-  const { data, error, loading, reload } = useTabData(() =>
-    Promise.all([ipc.getModelBreakdown(30), ipc.getCacheStats(30)]).then(([m, c]) => ({ models: m, cache: c })),
+  const version = useAppStore((s) => s.sessionDataVersion);
+  const { data, error, loading, reload } = useTabData(
+    () => Promise.all([ipc.getModelBreakdown(30), ipc.getCacheStats(30)]).then(([m, c]) => ({ models: m, cache: c })),
+    [version],
   );
   const models = data?.models ?? null;
   const cache = data?.cache ?? null;

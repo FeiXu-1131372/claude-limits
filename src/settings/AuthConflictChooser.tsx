@@ -1,7 +1,10 @@
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { IconButton } from '../components/ui/IconButton';
+import { X } from '../lib/icons';
 import { ipc } from '../lib/ipc';
 import { useAppStore } from '../lib/store';
+import { handleDragStart, closeWindow } from '../lib/window-chrome';
 
 export function AuthConflictChooser() {
   const conflict = useAppStore((s) => s.conflict);
@@ -14,7 +17,16 @@ export function AuthConflictChooser() {
   }
 
   return (
-    <div className="flex items-center justify-center h-full p-[var(--space-2xl)]">
+    <div className="relative flex flex-col h-full">
+      <div
+        onPointerDown={handleDragStart}
+        className="flex items-center justify-end gap-[var(--space-sm)] px-[var(--popover-pad)] pt-[var(--space-md)] pb-[var(--space-sm)] cursor-default select-none"
+      >
+        <IconButton label="Close" onClick={closeWindow}>
+          <X size={13} />
+        </IconButton>
+      </div>
+      <div className="flex items-center justify-center flex-1 px-[var(--space-2xl)] pb-[var(--space-2xl)]">
       <Card className="max-w-sm p-[var(--space-lg)]">
         <div className="flex flex-col gap-[var(--space-md)]">
           <h2 className="text-[length:var(--text-title)] font-[var(--weight-semibold)] text-[color:var(--color-text)]">
@@ -35,6 +47,7 @@ export function AuthConflictChooser() {
           </div>
         </div>
       </Card>
+    </div>
     </div>
   );
 }

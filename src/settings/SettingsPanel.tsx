@@ -5,7 +5,6 @@ import { Slider } from '../components/ui/Slider';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { useAppStore } from '../lib/store';
-import { ipc } from '../lib/ipc';
 import { LogOut } from '../lib/icons';
 import type { Settings } from '../lib/types';
 import { enable as enableAutostart, disable as disableAutostart } from '@tauri-apps/plugin-autostart';
@@ -18,6 +17,7 @@ export function SettingsPanel() {
   const setSettings = useAppStore((s) => s.setSettings);
   const usage = useAppStore((s) => s.usage);
   const hasClaudeCodeCreds = useAppStore((s) => s.hasClaudeCodeCreds);
+  const storeSignOut = useAppStore((s) => s.signOut);
   const [local, setLocal] = useState<Settings | null>(settings);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -60,7 +60,7 @@ export function SettingsPanel() {
   }
 
   async function signOut() {
-    await ipc.signOut();
+    await storeSignOut();
   }
 
   // Show actual auth state instead of hardcoding "OAuth".
@@ -71,7 +71,7 @@ export function SettingsPanel() {
       : { connected: false, email: null, source: null };
 
   return (
-    <div className="flex flex-col gap-[var(--space-lg)] h-full overflow-y-auto">
+    <div className="flex flex-col gap-[var(--space-lg)]">
       {/* General */}
       <section className="flex flex-col gap-[var(--space-sm)]">
         <h2 className="text-[length:var(--text-label)] font-[var(--weight-semibold)] text-[color:var(--color-text-muted)] uppercase tracking-[0.04em] px-[var(--space-2xs)]">
@@ -183,9 +183,6 @@ export function SettingsPanel() {
           </Button>
         </div>
       </div>
-
-      {/* Spacer */}
-      <div className="h-[var(--space-xl)]" />
     </div>
   );
 }

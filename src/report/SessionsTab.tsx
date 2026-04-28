@@ -6,6 +6,7 @@ import { formatTokens, formatCost } from '../lib/format';
 import { IconSessions } from '../lib/icons';
 import { ipc } from '../lib/ipc';
 import { useTabData } from '../lib/useTabData';
+import { useAppStore } from '../lib/store';
 
 const MODEL_BADGE: Record<string, 'opus' | 'sonnet' | 'haiku' | 'default'> = {
   opus: 'opus',
@@ -31,7 +32,11 @@ function formatTime(iso: string): string {
 }
 
 export function SessionsTab() {
-  const { data: events, error, loading, reload } = useTabData(() => ipc.getSessionHistory(7));
+  const version = useAppStore((s) => s.sessionDataVersion);
+  const { data: events, error, loading, reload } = useTabData(
+    () => ipc.getSessionHistory(7),
+    [version],
+  );
 
   const totalCost = useMemo(
     () => (events ?? []).reduce((sum, s) => sum + s.cost_usd, 0),

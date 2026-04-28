@@ -5,9 +5,14 @@ import { formatTokens } from '../lib/format';
 import { IconCache } from '../lib/icons';
 import { ipc } from '../lib/ipc';
 import { useTabData } from '../lib/useTabData';
+import { useAppStore } from '../lib/store';
 
 export function CacheTab() {
-  const { data, error, loading, reload } = useTabData(() => ipc.getCacheStats(30));
+  const version = useAppStore((s) => s.sessionDataVersion);
+  const { data, error, loading, reload } = useTabData(
+    () => ipc.getCacheStats(30),
+    [version],
+  );
 
   if (error) {
     return (

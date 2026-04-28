@@ -1,5 +1,5 @@
-{"ts":"2026-04-20T10:00:00Z","project":"a","model":"sonnet-4-6","input_tokens":10}
+{"type":"assistant","timestamp":"2026-04-20T10:00:00Z","cwd":"/x/a","message":{"model":"sonnet-4-6","usage":{"input_tokens":10}}}
 this is not json at all
-{"ts":"2026-04-20T10:01:00Z","project":"a","model":"sonnet-4-6","input_tokens":20}
+{"type":"assistant","timestamp":"2026-04-20T10:01:00Z","cwd":"/x/a","message":{"model":"sonnet-4-6","usage":{"input_tokens":20}}}
 {incomplete json
-{"ts":"2026-04-20T10:02:00Z","project":"a","model":"sonnet-4-6","input_tokens":30}
+{"type":"assistant","timestamp":"2026-04-20T10:02:00Z","cwd":"/x/a","message":{"model":"sonnet-4-6","usage":{"input_tokens":30}}}

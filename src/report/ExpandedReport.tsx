@@ -137,9 +137,27 @@ function TabBar({
     const container = containerRef.current;
     const btn = buttonRefs.current[activeId];
     if (!container || !btn) return;
-    const cRect = container.getBoundingClientRect();
-    const bRect = btn.getBoundingClientRect();
-    setIndicator({ x: bRect.left - cRect.left, w: bRect.width });
+    const measure = () => {
+      const cRect = container.getBoundingClientRect();
+      // Use a Range over the button's text node — that hugs the actual
+      // glyphs and ignores any width the box adds beyond them (UA padding,
+      // border, font side-bearings, letter-spacing trail). Falls back to
+      // the button rect if the range is empty (no text yet).
+      const range = document.createRange();
+      range.selectNodeContents(btn);
+      const tRect = range.getBoundingClientRect();
+      const rect = tRect.width > 0 ? tRect : btn.getBoundingClientRect();
+      setIndicator({ x: rect.left - cRect.left, w: rect.width });
+    };
+    measure();
+    // Window resize and font load can change the active button's metrics
+    // after first paint. Without re-measuring, the indicator drifts off the
+    // text — most visibly when the system font lazy-resolves and glyph
+    // widths shift between fallback and SF Pro.
+    const ro = new ResizeObserver(measure);
+    ro.observe(btn);
+    ro.observe(container);
+    return () => ro.disconnect();
   }, [activeId, tabs.length]);
 
   return (
@@ -168,6 +186,12 @@ function TabBar({
             className={[
               'relative inline-flex items-center',
               'h-[44px]',
+              // p-0 border-0 are explicit because WKWebView (Tauri on macOS)
+              // gives <button> a default 2px–6px UA padding that Tailwind
+              // preflight does not fully reset, inflating the measured
+              // bounding rect past the visible text and dragging the sliding
+              // underline indicator with it.
+              'p-0 border-0 bg-transparent',
               'text-[length:var(--text-label)] font-[var(--weight-medium)]',
               'tracking-[var(--tracking-label)] uppercase',
               'transition-colors duration-[var(--duration-fast)] ease-[var(--ease-out)]',

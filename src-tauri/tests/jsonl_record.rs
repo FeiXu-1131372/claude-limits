@@ -1,12 +1,12 @@
-use claude_usage_monitor_lib::jsonl_parser::SessionEvent;
+use claude_usage_monitor_lib::jsonl_parser::record::parse_event_line;
 
 #[test]
 fn current_schema_parses_every_line() {
     let raw = include_str!("fixtures/jsonl/current_schema.jsonl");
-    let events: Vec<SessionEvent> = raw
+    let events: Vec<_> = raw
         .lines()
         .filter(|l| !l.trim().is_empty())
-        .map(|l| serde_json::from_str(l).expect("parse"))
+        .map(|l| parse_event_line(l, "fallback").expect("parse"))
         .collect();
     assert_eq!(events.len(), 3);
     assert_eq!(events[1].model, "claude-opus-4-7-20260115");
@@ -17,7 +17,7 @@ fn current_schema_parses_every_line() {
 fn older_schema_with_unknown_fields_still_parses() {
     let raw = include_str!("fixtures/jsonl/older_schema.jsonl");
     for line in raw.lines().filter(|l| !l.trim().is_empty()) {
-        let e: SessionEvent = serde_json::from_str(line).expect("parse older");
+        let e = parse_event_line(line, "fallback").expect("parse older");
         assert!(!e.project.is_empty());
     }
 }
@@ -28,7 +28,7 @@ fn malformed_lines_are_individually_rejectable() {
     let (ok, err): (Vec<_>, Vec<_>) = raw
         .lines()
         .filter(|l| !l.trim().is_empty())
-        .partition(|l| serde_json::from_str::<SessionEvent>(l).is_ok());
+        .partition(|l| parse_event_line(l, "fallback").is_some());
     assert_eq!(ok.len(), 3);
     assert_eq!(err.len(), 2);
 }

@@ -6,6 +6,7 @@ import { formatTokens } from '../lib/format';
 import { IconHeatmap } from '../lib/icons';
 import { ipc } from '../lib/ipc';
 import { useTabData } from '../lib/useTabData';
+import { useAppStore } from '../lib/store';
 
 const CELL_SIZE = 11;
 const CELL_GAP = 3;
@@ -61,7 +62,11 @@ const levelColors: Record<number, string> = {
 };
 
 export function HeatmapTab() {
-  const { data: events, error, loading, reload } = useTabData(() => ipc.getSessionHistory(180));
+  const version = useAppStore((s) => s.sessionDataVersion);
+  const { data: events, error, loading, reload } = useTabData(
+    () => ipc.getSessionHistory(180),
+    [version],
+  );
 
   const data = useMemo(() => (events ? sessionsToHeatmap(events) : []), [events]);
   const [hovered, setHovered] = useState<string | null>(null);

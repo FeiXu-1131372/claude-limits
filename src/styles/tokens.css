@@ -17,8 +17,8 @@
  * entire typographic scale being ignored — every label rendered at 16px.
  *
  * Aesthetic direction: 'Instrument, not dashboard'. Numbers ARE the design.
- * Warm-tinted neutrals (hue 65°), single teal accent, status colors warm-
- * shifted (no pure red/green).
+ * Warm-tinted neutrals (hue 65°), Anthropic terracotta accent (hue 38°),
+ * status colors warm-shifted (no pure red/green).
  */
 
 @theme {
@@ -36,7 +36,7 @@
   --color-border: oklch(95% 0.02 65 / 0.22);            /* bumped from 0.14 so cards have a visible outline */
   --color-border-subtle: oklch(95% 0.02 65 / 0.10);
   --color-border-hover: oklch(95% 0.02 65 / 0.30);
-  --color-border-focus: oklch(72% 0.13 180 / 0.5);
+  --color-border-focus: oklch(67% 0.135 38 / 0.5);
 
   /* Text — alphas tuned to stay legible over the popover's warm-dark base
    * even when the user's wallpaper bleeds through the vibrancy slightly. */
@@ -44,10 +44,10 @@
   --color-text-secondary: oklch(86% 0.02 65 / 0.78);
   --color-text-muted: oklch(78% 0.025 65 / 0.62);
 
-  /* Single-hue accent (teal) */
-  --color-accent: oklch(72% 0.13 180);
-  --color-accent-dim: oklch(72% 0.13 180 / 0.14);
-  --color-accent-muted: oklch(72% 0.13 180 / 0.28);
+  /* Single-hue accent (Anthropic terracotta orange) */
+  --color-accent: oklch(67% 0.135 38);
+  --color-accent-dim: oklch(67% 0.135 38 / 0.14);
+  --color-accent-muted: oklch(67% 0.135 38 / 0.28);
 
   /* Status — warm-biased */
   --color-safe: oklch(76% 0.14 162);

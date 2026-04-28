@@ -1,41 +1,14 @@
-import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Banner } from '../components/ui/Banner';
 import { IconButton } from '../components/ui/IconButton';
 import { SettingsPanel } from '../settings/SettingsPanel';
 import { useAppStore } from '../lib/store';
 import { ipc } from '../lib/ipc';
 import { IconRefresh, IconSettings, ChevronRight, X } from '../lib/icons';
+import { handleDragStart, closeWindow } from '../lib/window-chrome';
 import { InstrumentColumn, InstrumentRow } from './InstrumentRow';
 import type { BurnRateProjection, Utilization } from '../lib/types';
-
-/**
- * Programmatic drag handler — Tauri's `data-tauri-drag-region` attribute
- * relies on a runtime listener that doesn't always activate on transparent,
- * always-on-top popover windows. Calling startDragging() explicitly on
- * mousedown is the reliable path. We skip the call when the user clicks an
- * actual interactive element so buttons keep working.
- */
-async function handleDragStart(e: MouseEvent<HTMLElement>) {
-  if (e.button !== 0) return;
-  const target = e.target as HTMLElement;
-  if (target.closest('button, input, a, select, textarea')) return;
-  e.preventDefault();
-  try {
-    await getCurrentWindow().startDragging();
-  } catch {
-    // No-op when running outside Tauri (e.g. localhost demo page).
-  }
-}
-
-async function closePopover() {
-  try {
-    await getCurrentWindow().hide();
-  } catch {
-    // Same — silently no-op outside Tauri.
-  }
-}
 
 function formatRelativeTime(iso: string): string {
   const t = new Date(iso).getTime();
@@ -348,8 +321,7 @@ function ChromeBar({
 }) {
   return (
     <div
-      data-tauri-drag-region
-      onMouseDown={handleDragStart}
+      onPointerDown={handleDragStart}
       className="flex items-center justify-between gap-[var(--space-sm)] px-[var(--popover-pad)] pt-[var(--space-md)] pb-[var(--space-sm)] cursor-default select-none"
     >
       <div className="flex items-center gap-[var(--space-xs)] pointer-events-none">
@@ -375,7 +347,7 @@ function ChromeBar({
         <IconButton label="Settings" onClick={onSettings}>
           <IconSettings size={13} />
         </IconButton>
-        <IconButton label="Close" onClick={closePopover}>
+        <IconButton label="Close" onClick={closeWindow}>
           <X size={13} />
         </IconButton>
       </div>
@@ -386,7 +358,7 @@ function ChromeBar({
 function Header({ title, onBack }: { title: string; onBack: () => void }) {
   return (
     <div
-      data-tauri-drag-region
+      onPointerDown={handleDragStart}
       className="flex items-center justify-between gap-[var(--space-sm)] px-[var(--popover-pad)] pt-[var(--space-md)] pb-[var(--space-sm)] cursor-default select-none"
     >
       <button
@@ -406,13 +378,15 @@ function Header({ title, onBack }: { title: string; onBack: () => void }) {
       <span className="text-[length:var(--text-label)] font-[var(--weight-semibold)] text-[color:var(--color-text-secondary)] tracking-[var(--tracking-label)] uppercase">
         {title}
       </span>
-      <span className="w-[40px]" /> {/* visual ballast for centering */}
+      <IconButton label="Close" onClick={closeWindow}>
+        <X size={13} />
+      </IconButton>
     </div>
   );
 }
 
 /**
- * Live = teal pulse. Stale = warm dimmed dot, no pulse. Offline = transparent
+ * Live = accent pulse. Stale = warm dimmed dot, no pulse. Offline = transparent
  * ring. Replaces the previous pill badge — quieter, doesn't compete with data.
  */
 function StatusDot({ live, stale }: { live: boolean; stale: boolean }) {

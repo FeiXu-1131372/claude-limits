@@ -6,8 +6,8 @@ use url::Url;
 
 pub const CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 pub const AUTHORIZE_URL: &str = "https://claude.ai/oauth/authorize";
-pub const TOKEN_URL: &str = "https://platform.claude.com/v1/oauth/token";
-pub const REDIRECT_URI: &str = "https://platform.claude.com/oauth/code/callback";
+pub const TOKEN_URL: &str = "https://console.anthropic.com/v1/oauth/token";
+pub const REDIRECT_URI: &str = "https://console.anthropic.com/oauth/code/callback";
 pub const SCOPES: &str = "user:profile user:inference";
 
 #[derive(Debug, Clone)]
@@ -33,6 +33,9 @@ pub fn generate_pkce() -> PkcePair {
 }
 
 pub fn build_authorize_url(pkce: &PkcePair) -> Result<String> {
+    // The `code=true` parameter we used to append is non-standard and causes
+    // claude.ai's authorize endpoint to reject the request as "Invalid OAuth
+    // Request" / "Invalid request format" — see anthropics/claude-code#29983.
     let mut url = Url::parse(AUTHORIZE_URL)?;
     url.query_pairs_mut()
         .append_pair("response_type", "code")
@@ -41,8 +44,7 @@ pub fn build_authorize_url(pkce: &PkcePair) -> Result<String> {
         .append_pair("scope", SCOPES)
         .append_pair("code_challenge", &pkce.challenge)
         .append_pair("code_challenge_method", "S256")
-        .append_pair("state", &pkce.state)
-        .append_pair("code", "true");
+        .append_pair("state", &pkce.state);
     Ok(url.into())
 }
 
@@ -78,8 +80,10 @@ mod tests {
         let url = build_authorize_url(&p).unwrap();
         assert!(url.contains("client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e"));
         assert!(url.contains("code_challenge_method=S256"));
-        assert!(url.contains("code=true"));
         assert!(url.contains(&format!("state={}", p.state)));
+        // code=true is non-standard and was causing claude.ai to reject the
+        // request — make sure it stays out (anthropics/claude-code#29983).
+        assert!(!url.contains("code=true"));
     }
 
     #[test]

@@ -149,19 +149,35 @@ pub fn run() {
             // oversized on first run after the upgrade.
             if let Some(popover) = app.get_webview_window("popover") {
                 use tauri::{LogicalSize, Size};
-                let _ = popover.set_size(Size::Logical(LogicalSize::new(360.0, 320.0)));
+                let _ = popover.set_size(Size::Logical(LogicalSize::new(360.0, 380.0)));
             }
 
             // Always start with the report window hidden — the user opens it
             // explicitly via the tray menu or the "See details" button. This
             // guards against any plugin / OS path that might otherwise leave
             // it visible from a previous session.
+            //
+            // Also intercept the OS close button: by default Tauri DESTROYS the
+            // window, after which get_webview_window("report") returns None and
+            // open_expanded_window silently no-ops — the user can never reopen
+            // the report. Hide instead so the window survives for next show().
             if let Some(report) = app.get_webview_window("report") {
                 let _ = report.hide();
+                let report_clone = report.clone();
+                report.on_window_event(move |ev| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = ev {
+                        api.prevent_close();
+                        let _ = report_clone.hide();
+                    }
+                });
             }
 
             // Apply native vibrancy to the popover so it reads as a Control
             // Center / Raycast-style menubar widget instead of a flat panel.
+            // The radius MUST match the `--radius-lg` token used by `#root`'s
+            // border-radius — otherwise the NSVisualEffectView stays
+            // rectangular and a sharp-cornered dark plate is visible behind
+            // the rounded HTML surface.
             #[cfg(target_os = "macos")]
             if let Some(popover) = app.get_webview_window("popover") {
                 use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
@@ -169,7 +185,7 @@ pub fn run() {
                     &popover,
                     NSVisualEffectMaterial::HudWindow,
                     Some(NSVisualEffectState::Active),
-                    None,
+                    Some(14.0),
                 );
             }
             #[cfg(target_os = "windows")]
@@ -264,12 +280,24 @@ pub fn run() {
                         let _ = handle_for_events.emit("session_ingested", n);
                     }
                 });
-                let _ = jsonl_parser::watcher::start(
+                // The WatcherHandle owns the notify-debouncer that drives the
+                // OS file watcher. Drop it and the debouncer is destroyed, the
+                // watcher stops, and no new JSONL writes are ever ingested —
+                // the report appears to "stop updating" mid-session and only
+                // refreshes when the app restarts (because the backfill above
+                // re-scans every file from scratch). Leak it so it lives for
+                // the process lifetime, which is the lifetime we want anyway.
+                match jsonl_parser::watcher::start(
                     state.db.clone(),
                     state.pricing.clone(),
                     root,
                     tx,
-                );
+                ) {
+                    Ok(handle) => {
+                        Box::leak(Box::new(handle));
+                    }
+                    Err(e) => tracing::error!("jsonl watcher failed to start: {e}"),
+                }
             }
 
             Ok(())

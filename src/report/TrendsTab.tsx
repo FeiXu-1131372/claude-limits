@@ -6,9 +6,14 @@ import { formatTokens } from '../lib/format';
 import { IconTrends } from '../lib/icons';
 import { ipc } from '../lib/ipc';
 import { useTabData } from '../lib/useTabData';
+import { useAppStore } from '../lib/store';
 
 export function TrendsTab() {
-  const { data, error, loading, reload } = useTabData(() => ipc.getDailyTrends(30));
+  const version = useAppStore((s) => s.sessionDataVersion);
+  const { data, error, loading, reload } = useTabData(
+    () => ipc.getDailyTrends(30),
+    [version],
+  );
   const [range, setRange] = useState<'7d' | '30d'>('30d');
 
   const visibleData = useMemo(() => {

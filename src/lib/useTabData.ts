@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 function toMessage(e: unknown): string {
   if (e instanceof Error && e.message) return e.message;
@@ -18,24 +18,31 @@ export interface TabDataState<T> {
 
 /**
  * Loads tab data with consistent loading/error/reload semantics. The loader
- * function is called on mount and on every reload(). The hook tracks whether
- * the load is in flight so consumers can render Loading / Error / Empty
- * states uniformly.
+ * runs on mount, on explicit reload(), and whenever any value in `triggers`
+ * changes — pass a session-data-version counter here so the tab auto-refreshes
+ * as new data arrives in the background.
  */
-export function useTabData<T>(loader: () => Promise<T>): TabDataState<T> {
+export function useTabData<T>(
+  loader: () => Promise<T>,
+  triggers: ReadonlyArray<unknown> = [],
+): TabDataState<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
+  // Track whether the first fetch has completed so trigger-driven refreshes
+  // can repaint without flickering "Loading…" between snapshots.
+  const hasLoadedOnce = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    if (!hasLoadedOnce.current) setLoading(true);
     setError(null);
     loader()
       .then((v) => {
         if (cancelled) return;
         setData(v);
+        hasLoadedOnce.current = true;
       })
       .catch((e) => {
         if (cancelled) return;
@@ -48,9 +55,9 @@ export function useTabData<T>(loader: () => Promise<T>): TabDataState<T> {
       cancelled = true;
     };
     // The loader closure is recomputed on every render; we deliberately
-    // re-run only on explicit reload() (tick).
+    // re-run only on explicit reload() (tick) or when an external trigger fires.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick]);
+  }, [tick, ...triggers]);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
   return { data, error, loading, reload };

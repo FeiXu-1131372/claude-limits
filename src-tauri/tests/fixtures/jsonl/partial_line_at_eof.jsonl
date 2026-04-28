@@ -1,2 +1,2 @@
-{"ts":"2026-04-20T10:00:00Z","project":"a","model":"sonnet-4-6","input_tokens":10}
-{"ts":"2026-04-20T10:01:00Z","project":"a","model":"sonnet-4-6","input_tokens":20
+{"type":"assistant","timestamp":"2026-04-20T10:00:00Z","cwd":"/x/a","message":{"model":"sonnet-4-6","usage":{"input_tokens":10}}}
+{"type":"assistant","timestamp":"2026-04-20T10:01:00Z","cwd":"/x/a","message":{"model":"sonnet-4-6","usage":{"input_tokens":20}}
