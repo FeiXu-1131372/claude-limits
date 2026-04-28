@@ -5,11 +5,11 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Env
 pub fn init(log_dir: PathBuf) -> tracing_appender::non_blocking::WorkerGuard {
     std::fs::create_dir_all(&log_dir).ok();
 
-    let file_appender = RollingFileAppender::new(Rotation::DAILY, &log_dir, "claude-usage-monitor.log");
+    let file_appender = RollingFileAppender::new(Rotation::DAILY, &log_dir, "claude-limits.log");
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
     let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info,claude_usage_monitor_lib=debug"));
+        .unwrap_or_else(|_| EnvFilter::new("info,claude_limits_lib=debug"));
 
     tracing_subscriber::registry()
         .with(filter)
@@ -22,7 +22,7 @@ pub fn init(log_dir: PathBuf) -> tracing_appender::non_blocking::WorkerGuard {
 }
 
 pub fn log_dir() -> PathBuf {
-    directories::ProjectDirs::from("com", "claude-usage-monitor", "ClaudeUsageMonitor")
+    directories::ProjectDirs::from("com", "claude-limits", "ClaudeLimits")
         .map(|p| p.data_local_dir().join("logs"))
         .unwrap_or_else(|| PathBuf::from(".claude-monitor/logs"))
 }

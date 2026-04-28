@@ -64,7 +64,7 @@ pub mod queries;
 pub use queries::*;
 
 pub fn default_dir() -> PathBuf {
-    directories::ProjectDirs::from("com", "claude-usage-monitor", "ClaudeUsageMonitor")
+    directories::ProjectDirs::from("com", "claude-limits", "ClaudeLimits")
         .map(|p| p.data_local_dir().to_path_buf())
         .unwrap_or_else(|| PathBuf::from(".claude-monitor"))
 }

@@ -1,5 +1,5 @@
 {
-  "name": "claude-usage-monitor",
+  "name": "claude-limits",
   "version": "0.1.0",
   "private": true,
   "type": "module",

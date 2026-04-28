@@ -1,6 +1,6 @@
-# Claude Usage Monitor
+# Claude Limits
 
-Cross-platform (macOS + Windows) menu-bar utility for monitoring Claude subscription rate-limit usage.
+Cross-platform (macOS + Windows) menu-bar utility for tracking Claude subscription rate limits.
 
 ## Design Context
 

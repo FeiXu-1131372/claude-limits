@@ -53,7 +53,7 @@ impl UsageClient {
             .header("anthropic-beta", ANTHROPIC_BETA)
             .header(
                 "User-Agent",
-                format!("claude-usage-monitor/{}", self.app_version),
+                format!("claude-limits/{}", self.app_version),
             );
 
         let resp = match req.send().await {

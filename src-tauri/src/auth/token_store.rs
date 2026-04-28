@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const KEYRING_SERVICE: &str = "claude-usage-monitor";
+const KEYRING_SERVICE: &str = "claude-limits";
 const KEYRING_USER: &str = "oauth_refresh";
 
 pub fn save(token: &StoredToken, fallback_dir: &Path) -> Result<()> {

@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-  claude_usage_monitor_lib::run();
+  claude_limits_lib::run();
 }

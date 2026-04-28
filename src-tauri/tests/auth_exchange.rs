@@ -1,4 +1,4 @@
-use claude_usage_monitor_lib::auth::exchange::TokenExchange;
+use claude_limits_lib::auth::exchange::TokenExchange;
 use mockito::Server;
 
 #[tokio::test]

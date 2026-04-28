@@ -1,5 +1,5 @@
 /*
- * Claude Usage Monitor — Design Tokens (Tailwind v4 @theme)
+ * Claude Limits — Design Tokens (Tailwind v4 @theme)
  *
  * Tokens defined here become BOTH CSS variables (--name) AND Tailwind v4
  * utility classes. The mapping is by prefix:

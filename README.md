@@ -1,6 +1,6 @@
-# Claude Usage Monitor
+# Claude Limits
 
-Cross-platform menu-bar utility for monitoring Claude subscription rate-limits on macOS and Windows.
+Cross-platform menu-bar utility that tracks your Claude subscription rate limits — 5-hour, weekly, and per-model — on macOS and Windows.
 
 ## Features
 - 5-hour and 7-day usage buckets (with Opus / Sonnet splits)
@@ -13,7 +13,7 @@ Cross-platform menu-bar utility for monitoring Claude subscription rate-limits o
 ## First launch
 Downloads are **unsigned**. On first launch:
 
-- **macOS:** `xattr -d com.apple.quarantine "/Applications/Claude Usage Monitor.app"` or right-click -> Open from Finder.
+- **macOS:** `xattr -d com.apple.quarantine "/Applications/Claude Limits.app"` or right-click -> Open from Finder.
 - **Windows:** SmartScreen -> "More info" -> "Run anyway".
 
 WebView2 is required on Windows 10 (Windows 11 ships it). If missing, the installer auto-bootstraps it.

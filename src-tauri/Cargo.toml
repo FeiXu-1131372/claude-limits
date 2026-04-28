@@ -1,14 +1,14 @@
 [package]
-name = "claude-usage-monitor"
+name = "claude-limits"
 version = "0.1.0"
-description = "Cross-platform Claude subscription usage monitor"
-authors = ["Claude Usage Monitor contributors"]
+description = "Track your Claude rate limits — 5h, weekly, Opus, Sonnet"
+authors = ["Claude Limits contributors"]
 license = "MIT"
 edition = "2021"
 rust-version = "1.89"
 
 [lib]
-name = "claude_usage_monitor_lib"
+name = "claude_limits_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
