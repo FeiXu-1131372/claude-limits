@@ -38,70 +38,59 @@ impl Db {
         Ok(db)
     }
 
-    /// Try to open `db_path` and verify its integrity.  On failure (open error
+    /// Try to open `db_path` and verify its integrity. On failure (open error
     /// or `PRAGMA integrity_check` ≠ "ok"), rename the corrupt file and create
-    /// a fresh DB in its place.  Returns `(connection, was_recovered)`.
+    /// a fresh DB in its place. Returns `(connection, was_recovered)`.
     fn open_or_recover(db_path: &Path) -> Result<(Connection, bool)> {
-        let corrupt = Self::is_corrupt(db_path);
-
-        if corrupt {
-            // Rename the bad file so it's recoverable by the user.
-            let ts = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
-            let backup = db_path.with_file_name(format!(
-                "{}.corrupt-{ts}",
-                db_path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("data.db")
-            ));
-            tracing::warn!(
-                "corrupt DB detected — renaming {:?} to {:?} and recreating",
-                db_path,
-                backup,
-            );
-            // Best-effort rename; if it fails we still try to create a fresh DB.
-            let _ = std::fs::rename(db_path, &backup);
-
-            let conn = Connection::open(db_path).context("open fresh sqlite after recovery")?;
-            conn.execute_batch(include_str!("schema.sql"))
-                .context("apply schema on recovered db")?;
-            return Ok((conn, true));
-        }
-
-        // Normal path: open succeeded and integrity is clean.
-        let conn = Connection::open(db_path).context("open sqlite")?;
-        // schema.sql holds the *current* shape (v2). For a fresh DB this
-        // creates everything; for an existing v1 DB it's a no-op (CREATE
-        // TABLE IF NOT EXISTS) and the migration block below brings it
-        // forward.
-        conn.execute_batch(include_str!("schema.sql"))
-            .context("apply schema")?;
-        Ok((conn, false))
-    }
-
-    /// Returns `true` when `db_path` cannot be opened or `PRAGMA integrity_check`
-    /// returns anything other than a single "ok" row.
-    fn is_corrupt(db_path: &Path) -> bool {
-        // A missing file is not corrupt — SQLite will create a fresh one.
+        // No file yet — fresh install. Create and return directly.
         if !db_path.exists() {
-            return false;
+            let conn = Self::create_fresh_db(db_path).context("create fresh sqlite")?;
+            return Ok((conn, false));
         }
-        match Connection::open(db_path) {
-            Err(_) => true,
-            Ok(conn) => {
-                // integrity_check returns one or more rows.  A healthy DB
-                // returns exactly one row containing the text "ok".
-                let result: rusqlite::Result<String> = conn.query_row(
-                    "PRAGMA integrity_check",
-                    [],
-                    |r| r.get(0),
-                );
-                !matches!(result, Ok(s) if s == "ok")
+
+        // Existing file: open once and probe integrity — avoid opening twice.
+        if let Ok(conn) = Connection::open(db_path) {
+            let health: rusqlite::Result<String> =
+                conn.query_row("PRAGMA integrity_check", [], |r| r.get(0));
+            if matches!(health, Ok(ref s) if s == "ok") {
+                // Healthy existing DB: apply schema (IF NOT EXISTS — safe no-op
+                // on v2 DBs; adds missing tables on v1 DBs) and let migrate()
+                // handle version advancement.
+                conn.execute_batch(include_str!("schema.sql")).context("apply schema")?;
+                return Ok((conn, false));
             }
         }
+
+        // File exists but is corrupt — rename it and recreate.
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let backup = db_path.with_file_name(format!(
+            "{}.corrupt-{ts}",
+            db_path.file_name().and_then(|n| n.to_str()).unwrap_or("data.db")
+        ));
+        tracing::warn!(
+            "corrupt DB detected — renaming {:?} to {:?} and recreating",
+            db_path,
+            backup,
+        );
+        let _ = std::fs::rename(db_path, &backup);
+        let conn = Self::create_fresh_db(db_path).context("create fresh sqlite after recovery")?;
+        Ok((conn, true))
+    }
+
+    /// Create a brand-new SQLite database with the current schema and stamp
+    /// schema_version=2 so that migrate() skips steps meant for v1 upgrades.
+    fn create_fresh_db(db_path: &Path) -> Result<Connection> {
+        let conn = Connection::open(db_path).context("open sqlite")?;
+        conn.execute_batch(include_str!("schema.sql")).context("apply schema")?;
+        conn.execute(
+            "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+            [2_i64],
+        )
+        .context("stamp schema version")?;
+        Ok(conn)
     }
 
     /// Brings the DB up to the current schema version. Each block is
