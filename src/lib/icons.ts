@@ -10,6 +10,7 @@ export {
   BarChart3,
   Calendar,
   Check,
+  ChevronDown,
   ChevronRight,
   Clock,
   Database,

@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { formatTokens, formatCost } from '../lib/format';
-import { IconSessions } from '../lib/icons';
+import { ChevronDown, ChevronRight, IconSessions } from '../lib/icons';
 import { ipc } from '../lib/ipc';
 import { useTabData } from '../lib/useTabData';
 import { useAppStore } from '../lib/store';
@@ -37,10 +37,23 @@ interface AggregatedSession {
   project: string;
   latest_ts: string;
   turn_count: number;
-  total_tokens: number;
+  /** Headline tokens shown on the collapsed row: input + output only.
+   * This represents the "new content" of the session, which is what
+   * users intuitively mean by "size of the session." Cache totals
+   * (which can be 10–100x larger but mostly reuse) are surfaced in the
+   * expandable breakdown. */
+  headline_tokens: number;
   total_cost_usd: number;
   /** Model with the most output tokens — surfaced via the row's badge. */
   dominant_model: string;
+  /** Per-category token totals for the expandable breakdown. */
+  breakdown: {
+    input: number;
+    output: number;
+    cache_read: number;
+    cache_write_5m: number;
+    cache_write_1h: number;
+  };
 }
 
 /**
@@ -61,25 +74,27 @@ function aggregateSessions(events: SessionEvent[]): AggregatedSession[] {
         project: e.project,
         latest_ts: e.ts,
         turn_count: 0,
-        total_tokens: 0,
+        headline_tokens: 0,
         total_cost_usd: 0,
         dominant_model: e.model,
+        breakdown: {
+          input: 0,
+          output: 0,
+          cache_read: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+        },
         _modelTokens: new Map(),
       };
       byFile.set(id, agg);
     }
     agg.turn_count += 1;
-    // Total must include cache tokens — otherwise the displayed number
-    // looks tiny next to the cost. Cache writes especially can dominate
-    // the bill on long Claude Code sessions (50–200K tokens per turn at
-    // $3.75/MTok Sonnet or $18.75/MTok Opus). Excluding them made users
-    // think the cost calc was broken when actually the count was.
-    agg.total_tokens +=
-      e.input_tokens +
-      e.output_tokens +
-      e.cache_read_tokens +
-      e.cache_creation_5m_tokens +
-      e.cache_creation_1h_tokens;
+    agg.headline_tokens += e.input_tokens + e.output_tokens;
+    agg.breakdown.input += e.input_tokens;
+    agg.breakdown.output += e.output_tokens;
+    agg.breakdown.cache_read += e.cache_read_tokens;
+    agg.breakdown.cache_write_5m += e.cache_creation_5m_tokens;
+    agg.breakdown.cache_write_1h += e.cache_creation_1h_tokens;
     agg.total_cost_usd += e.cost_usd;
     if (e.ts > agg.latest_ts) agg.latest_ts = e.ts;
     agg._modelTokens.set(
@@ -108,12 +123,53 @@ function aggregateSessions(events: SessionEvent[]): AggregatedSession[] {
   return result;
 }
 
+const BREAKDOWN_ROWS: Array<{ key: keyof AggregatedSession['breakdown']; label: string }> = [
+  { key: 'input', label: 'Input' },
+  { key: 'output', label: 'Output' },
+  { key: 'cache_read', label: 'Cache read' },
+  { key: 'cache_write_5m', label: 'Cache write (5m)' },
+  { key: 'cache_write_1h', label: 'Cache write (1h)' },
+];
+
+function BreakdownTable({ breakdown }: { breakdown: AggregatedSession['breakdown'] }) {
+  // Hide rows with zero tokens — keeps the table tight, since most
+  // sessions don't use the 1h cache tier at all.
+  const rows = BREAKDOWN_ROWS.filter((r) => breakdown[r.key] > 0);
+  return (
+    <div
+      className={[
+        'mx-[var(--space-sm)] mb-[var(--space-sm)]',
+        'rounded-[var(--radius-md)] border border-[var(--color-border-subtle)]',
+        'bg-[var(--color-bg-card)]',
+      ].join(' ')}
+    >
+      {rows.map((r, i) => (
+        <div
+          key={r.key}
+          className={[
+            'flex items-center justify-between px-[var(--space-md)] py-[var(--space-xs)]',
+            i < rows.length - 1 ? 'border-b border-[var(--color-border-subtle)]' : '',
+          ].join(' ')}
+        >
+          <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
+            {r.label}
+          </span>
+          <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-secondary)] tabular-nums">
+            {formatTokens(breakdown[r.key])}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function SessionsTab() {
   const version = useAppStore((s) => s.sessionDataVersion);
   const { data: events, error, loading, reload } = useTabData(
     () => ipc.getSessionHistory(7),
     [version],
   );
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const sessions = useMemo(
     () => aggregateSessions(events ?? []),
@@ -162,39 +218,51 @@ export function SessionsTab() {
       <div className="flex flex-col">
         {sessions.slice(0, 100).map((session) => {
           const key = modelKey(session.dominant_model);
+          const isOpen = expandedId === session.id;
+          const Chevron = isOpen ? ChevronDown : ChevronRight;
           return (
-            <div
-              key={session.id}
-              className={[
-                'flex items-center gap-[var(--space-md)]',
-                'px-[var(--space-sm)] py-[var(--space-sm)]',
-                'border-b border-[var(--color-border-subtle)]',
-                'transition-[background] duration-[var(--duration-fast)]',
-                'hover:bg-[var(--color-bg-card)]',
-              ].join(' ')}
-            >
-              <div className="flex flex-col min-w-0 flex-1">
-                <div className="flex items-center gap-[var(--space-sm)]">
-                  <span className="text-[length:var(--text-body)] text-[color:var(--color-text)] truncate">
-                    {session.project}
+            <div key={session.id} className="border-b border-[var(--color-border-subtle)]">
+              <button
+                type="button"
+                onClick={() => setExpandedId(isOpen ? null : session.id)}
+                className={[
+                  'w-full flex items-center gap-[var(--space-sm)]',
+                  'px-[var(--space-sm)] py-[var(--space-sm)]',
+                  'text-left',
+                  'transition-[background] duration-[var(--duration-fast)]',
+                  'hover:bg-[var(--color-bg-card)]',
+                  isOpen ? 'bg-[var(--color-bg-card)]' : '',
+                ].join(' ')}
+                aria-expanded={isOpen}
+              >
+                <Chevron
+                  size={14}
+                  className="shrink-0 text-[color:var(--color-text-muted)]"
+                />
+                <div className="flex flex-col min-w-0 flex-1">
+                  <div className="flex items-center gap-[var(--space-sm)]">
+                    <span className="text-[length:var(--text-body)] text-[color:var(--color-text)] truncate">
+                      {session.project}
+                    </span>
+                    <Badge variant={MODEL_BADGE[key] ?? 'default'}>
+                      {key}
+                    </Badge>
+                  </div>
+                  <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
+                    {formatTime(session.latest_ts)} · {session.turn_count} {session.turn_count === 1 ? 'turn' : 'turns'}
                   </span>
-                  <Badge variant={MODEL_BADGE[key] ?? 'default'}>
-                    {key}
-                  </Badge>
                 </div>
-                <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
-                  {formatTime(session.latest_ts)} · {session.turn_count} {session.turn_count === 1 ? 'turn' : 'turns'}
-                </span>
-              </div>
 
-              <div className="flex items-center gap-[var(--space-md)] shrink-0">
-                <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-secondary)] tabular-nums">
-                  {formatTokens(session.total_tokens)}
-                </span>
-                <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-muted)] tabular-nums min-w-[48px] text-right">
-                  {formatCost(session.total_cost_usd)}
-                </span>
-              </div>
+                <div className="flex items-center gap-[var(--space-md)] shrink-0">
+                  <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-secondary)] tabular-nums">
+                    {formatTokens(session.headline_tokens)}
+                  </span>
+                  <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-muted)] tabular-nums min-w-[48px] text-right">
+                    {formatCost(session.total_cost_usd)}
+                  </span>
+                </div>
+              </button>
+              {isOpen && <BreakdownTable breakdown={session.breakdown} />}
             </div>
           );
         })}
