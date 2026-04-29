@@ -15,7 +15,7 @@ const OUTER_R: f32 = 14.0;
 const OUTER_STROKE: f32 = 2.5;
 const INNER_R: f32 = 9.0;
 const INNER_STROKE: f32 = 2.5;
-const DIGIT_HEIGHT_PX: f32 = 9.0;
+const DIGIT_HEIGHT_PX: f32 = 17.0;
 
 pub fn render(five_hour: Option<f64>, seven_day: Option<f64>, paused: bool) -> Vec<u8> {
     let mut pixmap = Pixmap::new(SIZE, SIZE).expect("32x32 fits in memory");
@@ -23,16 +23,12 @@ pub fn render(five_hour: Option<f64>, seven_day: Option<f64>, paused: bool) -> V
 
     let no_data = paused || (five_hour.is_none() && seven_day.is_none());
 
-    draw_ring(&mut pixmap, OUTER_R, OUTER_STROKE, if no_data { None } else { seven_day });
-    draw_ring(&mut pixmap, INNER_R, INNER_STROKE, if no_data { None } else { five_hour });
+    draw_ring(&mut pixmap, OUTER_R, OUTER_STROKE, if no_data { None } else { five_hour });
+    draw_ring(&mut pixmap, INNER_R, INNER_STROKE, if no_data { None } else { seven_day });
 
-    let worst = match (five_hour, seven_day) {
-        (Some(a), Some(b)) => Some(a.max(b)),
-        (Some(v), None) | (None, Some(v)) => Some(v),
-        (None, None) => None,
-    };
-    let digit_str = match worst {
-        Some(p) if !no_data => format!("{:>2}", (p.clamp(0.0, 99.0).round()) as i64),
+    let display_val = five_hour.or(seven_day);
+    let digit_str = match display_val {
+        Some(p) if !no_data => format!("{}", (p.clamp(0.0, 99.0).round()) as i64),
         _ => "\u{2014}".to_string(),
     };
     draw_centered_text(&mut pixmap, &digit_str, CX, CY, DIGIT_HEIGHT_PX, shared::text());
@@ -80,28 +76,38 @@ fn draw_ring(pixmap: &mut Pixmap, radius: f32, stroke_width: f32, pct: Option<f6
 fn draw_centered_text(
     pixmap: &mut Pixmap,
     text: &str,
-    x_center: f32,
-    y_baseline: f32,
-    height_px: f32,
+    cx: f32,
+    cy: f32,
+    cap_height_px: f32,
     color: tiny_skia::Color,
 ) {
-    let scale = height_px / digits::units_per_em();
-    let advance = 0.6 * digits::units_per_em() * scale;
-    let total_width = advance * text.chars().count() as f32;
-    let start_x = x_center - total_width / 2.0;
+    let em = digits::units_per_em();
+    let scale = cap_height_px / digits::cap_height();
+
+    // Compute the total width using each glyph's true advance.
+    let total_width: f32 = text
+        .chars()
+        .map(|ch| digits::glyph_advance(ch).unwrap_or(em * 0.6) * scale)
+        .sum();
+
+    // Baseline placement: visible block (cap_height_px) is centered on cy, so
+    // the block top is at (cy - cap_height_px/2) and the baseline sits at the
+    // bottom of that block.
+    let baseline_y = cy + cap_height_px / 2.0;
+    let mut pen_x = cx - total_width / 2.0;
 
     let mut paint = Paint::default();
     paint.set_color(color);
     paint.anti_alias = true;
 
-    let mut pen_x = start_x;
     for ch in text.chars() {
+        let advance_px = digits::glyph_advance(ch).unwrap_or(em * 0.6) * scale;
         if let Some(path) = digits::glyph_path(ch) {
             let transform = Transform::from_scale(scale, scale)
-                .post_translate(pen_x, y_baseline);
+                .post_translate(pen_x, baseline_y);
             pixmap.fill_path(path, &paint, FillRule::Winding, transform, None);
         }
-        pen_x += advance;
+        pen_x += advance_px;
     }
 }
 
@@ -125,7 +131,7 @@ mod tests {
     }
 
     #[test]
-    fn worst_value_drives_center_digits() {
+    fn five_hour_value_drives_center_digits() {
         // 80% on 5h, 30% on 7d: the digits should be "80", in danger color
         // is wrong (80 = warn). Here we just confirm SOMETHING gets rendered.
         let bytes = render(Some(80.0), Some(30.0), false);
