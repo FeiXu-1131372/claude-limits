@@ -178,7 +178,7 @@ pub async fn start_oauth_flow(state: State<'_, Arc<AppState>>) -> Result<String,
     let url = build_authorize_url(&pkce).map_err(err_to_string)?;
     // Explicitly drop any existing pair before replacing so secrets don't
     // linger in memory longer than necessary.
-    let old = state.pending_oauth.write().replace((pkce, std::time::Instant::now()));
+    let old = state.auth.pending_oauth.write().replace((pkce, std::time::Instant::now()));
     drop(old);
     Ok(url)
 }
@@ -189,33 +189,31 @@ pub async fn submit_oauth_code(
     pasted: String,
     state: State<'_, Arc<AppState>>,
 ) -> Result<(), String> {
-    use crate::auth::exchange::TokenExchange;
     use crate::auth::oauth_paste_back::parse_pasted_code;
     use crate::auth::token_store;
 
     const PKCE_TTL: std::time::Duration = std::time::Duration::from_secs(600);
 
-    let entry = state.pending_oauth.read().clone();
+    let entry = state.auth.pending_oauth.read().clone();
     let pkce = match entry {
         None => return Err("No active sign-in — click 'Sign in with Claude' first".to_string()),
         Some((pair, started_at)) if started_at.elapsed() > PKCE_TTL => {
             // Expired — drop the pair immediately to clear the secret from memory,
             // then return an error so the user re-initiates the flow.
-            drop(state.pending_oauth.write().take());
+            drop(state.auth.pending_oauth.write().take());
             return Err("Sign-in session expired (10-minute limit). Click 'Sign in with Claude' to start again.".to_string());
         }
         Some((pair, _)) => pair,
     };
 
     let code = parse_pasted_code(&pasted, &pkce.state).map_err(err_to_string)?;
-    let exchange = TokenExchange::new();
-    let token = exchange
+    let token = state.auth.exchange
         .exchange_code(&code, &pkce.verifier)
         .await
         .map_err(err_to_string)?;
     token_store::save(&token, &state.fallback_dir).await.map_err(err_to_string)?;
 
-    *state.pending_oauth.write() = None;
+    *state.auth.pending_oauth.write() = None;
     state.auth.set_preferred_source(AuthSource::OAuth).await;
     let mut settings = state.settings.read().clone();
     settings.preferred_auth_source = Some(AuthSource::OAuth);
@@ -255,7 +253,7 @@ pub async fn sign_out(
     use crate::tray;
     token_store::clear(&state.fallback_dir).map_err(err_to_string)?;
     *state.cached_usage.write() = None;
-    *state.pending_oauth.write() = None;
+    *state.auth.pending_oauth.write() = None;
     crate::poll_loop::reset_stale_flag();
     tray::set_level(&app, None, None, None, None, true);
     let mut settings = state.settings.read().clone();

@@ -19,7 +19,8 @@ pub fn reset_stale_flag() {
 
 pub fn spawn(handle: AppHandle, state: Arc<AppState>) {
     tauri::async_runtime::spawn(async move {
-        let _ = poll_once(&handle, &state).await;
+        let mut recent_five_hour: VecDeque<(DateTime<Utc>, f64)> = VecDeque::new();
+        let _ = poll_once(&handle, &state, &mut recent_five_hour).await;
         let mut backoff = Duration::from_secs(60);
         loop {
             let interval = {
@@ -41,7 +42,7 @@ pub fn spawn(handle: AppHandle, state: Arc<AppState>) {
                 }
             }
 
-            match poll_once(&handle, &state).await {
+            match poll_once(&handle, &state, &mut recent_five_hour).await {
                 PollResult::Ok => {
                     STALE_EMITTED.store(false, Ordering::Relaxed);
                     backoff = Duration::from_secs(60);
@@ -62,8 +63,12 @@ enum PollResult {
     Transient,
 }
 
-async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
-    let (token, _source, account) = match state.auth.get_access_token().await {
+async fn poll_once(
+    handle: &AppHandle,
+    state: &AppState,
+    recent_five_hour: &mut VecDeque<(DateTime<Utc>, f64)>,
+) -> PollResult {
+    let (token, source, account) = match state.auth.get_access_token().await {
         Ok(t) => t,
         Err(AuthError::NoSource) => {
             tray::set_level(handle, None, None, None, None, true);
@@ -102,7 +107,7 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
             // projection. Resets between windows are handled by trimming
             // entries that fall outside [resets_at - 5h, resets_at].
             let burn_rate = update_history_and_compute_burn_rate(
-                state,
+                recent_five_hour,
                 &snapshot,
                 Utc::now(),
             );
@@ -113,6 +118,7 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
                 account_email: account.email.clone(),
                 last_error: None,
                 burn_rate,
+                auth_source: source,
             };
             *state.cached_usage.write() = Some(cached.clone());
             let _ = handle.emit("usage_updated", &cached);
@@ -181,6 +187,7 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
                     account_email: account.email.clone(),
                     last_error: Some(e.clone()),
                     burn_rate: None,
+                    auth_source: source,
                 },
                 |mut c| {
                     c.last_error = Some(e.clone());
@@ -198,15 +205,13 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
 /// entries that fall outside the live window, and return a projection if
 /// we have enough samples (≥2 points spanning ≥2 minutes).
 fn update_history_and_compute_burn_rate(
-    state: &AppState,
+    buf: &mut VecDeque<(DateTime<Utc>, f64)>,
     snapshot: &UsageSnapshot,
     now: DateTime<Utc>,
 ) -> Option<BurnRateProjection> {
     let five_hour = snapshot.five_hour.as_ref()?;
     let resets_at = five_hour.resets_at;
     let window_start = resets_at - ChronoDuration::hours(5);
-
-    let mut buf = state.recent_five_hour.write();
 
     // Drop samples from previous windows. Keeps memory bounded and avoids
     // basing slope on a stale window's values when a reset has happened.
@@ -219,7 +224,7 @@ fn update_history_and_compute_burn_rate(
     }
     buf.push_back((now, five_hour.utilization));
 
-    project_burn_rate(&buf, resets_at, now)
+    project_burn_rate(buf, resets_at, now)
 }
 
 /// Pure function — no AppState, no I/O — so it can be tested directly.

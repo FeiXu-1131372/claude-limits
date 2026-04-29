@@ -1,12 +1,10 @@
 use crate::auth::{AuthOrchestrator, AuthSource};
-use crate::auth::oauth_paste_back::PkcePair;
 use crate::jsonl_parser::PricingTable;
 use crate::store::Db;
 use crate::usage_api::{UsageClient, UsageSnapshot};
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::Notify;
 
@@ -59,6 +57,7 @@ pub struct CachedUsage {
     pub last_error: Option<String>,
     #[serde(default)]
     pub burn_rate: Option<BurnRateProjection>,
+    pub auth_source: AuthSource,
 }
 
 impl CachedUsage {
@@ -76,17 +75,9 @@ pub struct AppState {
     pub pricing: Arc<PricingTable>,
     pub settings: RwLock<Settings>,
     pub cached_usage: RwLock<Option<CachedUsage>>,
-    pub pending_oauth: RwLock<Option<(PkcePair, std::time::Instant)>>,
     pub fallback_dir: std::path::PathBuf,
     // Wakes the poll loop early when the user requests an immediate refresh.
     pub force_refresh: Notify,
-    /// In-memory rolling history of (poll_time, five_hour.utilization)
-    /// samples for the current 5h window. Used to compute the burn-rate
-    /// projection. Trimmed to entries inside the live window on every
-    /// successful poll, so its size is bounded by polling_interval × 5h.
-    /// Resets on app restart — burn rate is unavailable until at least 2
-    /// polls have completed (~2 minutes after launch with default config).
-    pub recent_five_hour: RwLock<VecDeque<(DateTime<Utc>, f64)>>,
 }
 
 impl AppState {
