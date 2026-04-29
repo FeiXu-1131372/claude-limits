@@ -43,9 +43,11 @@ fn draw_ring(pixmap: &mut Pixmap, radius: f32, stroke_width: f32, pct: Option<f6
         pb.finish().expect("circle is valid")
     };
 
-    let mut stroke = Stroke::default();
-    stroke.width = stroke_width;
-    stroke.line_cap = tiny_skia::LineCap::Butt;
+    let mut stroke = Stroke {
+        width: stroke_width,
+        line_cap: tiny_skia::LineCap::Butt,
+        ..Default::default()
+    };
 
     // Track.
     let mut track_paint = Paint::default();

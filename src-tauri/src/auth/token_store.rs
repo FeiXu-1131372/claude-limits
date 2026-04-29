@@ -96,7 +96,7 @@ async fn restrict_permissions(p: PathBuf) -> Result<()> {
             .context("icacls failed to run")
     })
     .await
-    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))??;
+    .map_err(io::Error::other)??;
     if !status.success() {
         anyhow::bail!("icacls returned non-zero");
     }
