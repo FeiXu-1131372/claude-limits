@@ -27,6 +27,7 @@ export function CompactPopover() {
   const stale = useAppStore((s) => s.stale);
   const conflict = useAppStore((s) => s.conflict);
   const dismissBanner = useAppStore((s) => s.dismissBanner);
+  const toggleViewMode = useAppStore((s) => s.toggleViewMode);
   const [view, setView] = useState<'home' | 'settings'>('home');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -64,7 +65,6 @@ export function CompactPopover() {
   const snap = usage.snapshot;
   const warn = thresholds[0] ?? 75;
   const danger = thresholds[1] ?? 90;
-  const toggleViewMode = useAppStore((s) => s.toggleViewMode);
 
   return (
     <Shell>
