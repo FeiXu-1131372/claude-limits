@@ -4,6 +4,8 @@ use chrono::{DateTime, Utc};
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
+use crate::app_state::Settings;
+
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct StoredAccount {
     pub id: String,
@@ -207,6 +209,38 @@ impl Db {
         )?;
         Ok(())
     }
+
+    /// Persist user settings to the `settings` table as a single JSON blob
+    /// keyed on `"settings"`. Subsequent calls overwrite the previous value.
+    pub fn save_settings(&self, settings: &Settings) -> Result<()> {
+        let json = serde_json::to_string(settings)?;
+        self.conn().execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES ('settings', ?1)",
+            params![json],
+        )?;
+        Ok(())
+    }
+
+    /// Load user settings from the `settings` table. Returns `None` when no
+    /// row has been written yet (first launch), so the caller can fall back to
+    /// `Settings::default()`.
+    pub fn load_settings(&self) -> Result<Option<Settings>> {
+        let conn = self.conn();
+        let row = conn
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'settings'",
+                [],
+                |r| r.get::<_, String>(0),
+            )
+            .optional()?;
+        match row {
+            None => Ok(None),
+            Some(json) => {
+                let settings = serde_json::from_str(&json)?;
+                Ok(Some(settings))
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -311,6 +345,40 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(got.timestamp(), now.timestamp());
+    }
+
+    #[test]
+    fn settings_roundtrip() {
+        let dir = tempdir().unwrap();
+        let db = Db::open(dir.path()).unwrap();
+
+        // No row written yet — should return None.
+        assert!(db.load_settings().unwrap().is_none());
+
+        // Write non-default settings.
+        let s = Settings {
+            polling_interval_secs: 60,
+            thresholds: vec![50, 80, 95],
+            theme: "dark".into(),
+            launch_at_login: true,
+            crash_reports: true,
+        };
+        db.save_settings(&s).unwrap();
+
+        // Read back and assert every field survived the round-trip.
+        let loaded = db.load_settings().unwrap().expect("settings row");
+        assert_eq!(loaded.polling_interval_secs, s.polling_interval_secs);
+        assert_eq!(loaded.thresholds, s.thresholds);
+        assert_eq!(loaded.theme, s.theme);
+        assert_eq!(loaded.launch_at_login, s.launch_at_login);
+        assert_eq!(loaded.crash_reports, s.crash_reports);
+
+        // Overwrite and confirm the latest value wins (UPSERT).
+        let s2 = Settings { polling_interval_secs: 120, ..Settings::default() };
+        db.save_settings(&s2).unwrap();
+        let loaded2 = db.load_settings().unwrap().expect("updated settings row");
+        assert_eq!(loaded2.polling_interval_secs, 120);
+        assert_eq!(loaded2.theme, Settings::default().theme);
     }
 
     #[test]

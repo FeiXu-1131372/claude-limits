@@ -27,12 +27,20 @@ pub fn run() {
         usage_api::UsageClient::new(env!("CARGO_PKG_VERSION").to_string()).expect("client"),
     );
 
+    let persisted_settings = db
+        .load_settings()
+        .unwrap_or_else(|e| {
+            tracing::warn!("failed to load persisted settings, using defaults: {e}");
+            None
+        })
+        .unwrap_or_default();
+
     let app_state = Arc::new(AppState {
         db: db.clone(),
         auth,
         usage: usage_client,
         pricing: pricing.clone(),
-        settings: parking_lot::RwLock::new(app_state::Settings::default()),
+        settings: parking_lot::RwLock::new(persisted_settings),
         cached_usage: parking_lot::RwLock::new(None),
         pending_oauth: parking_lot::RwLock::new(None),
         fallback_dir: data_dir.clone(),
