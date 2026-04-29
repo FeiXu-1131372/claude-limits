@@ -20,14 +20,14 @@ pub struct PkcePair {
 
 pub fn generate_pkce() -> PkcePair {
     let mut verifier_bytes = [0u8; 32];
-    rand::thread_rng().fill_bytes(&mut verifier_bytes);
+    rand::rng().fill_bytes(&mut verifier_bytes);
     let verifier = URL_SAFE_NO_PAD.encode(verifier_bytes);
 
     let challenge_bytes = Sha256::digest(verifier.as_bytes());
     let challenge = URL_SAFE_NO_PAD.encode(challenge_bytes);
 
     let mut state_bytes = [0u8; 16];
-    rand::thread_rng().fill_bytes(&mut state_bytes);
+    rand::rng().fill_bytes(&mut state_bytes);
     let state = URL_SAFE_NO_PAD.encode(state_bytes);
 
     PkcePair { verifier, challenge, state }

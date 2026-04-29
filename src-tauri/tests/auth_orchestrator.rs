@@ -45,7 +45,9 @@ async fn no_sources_errors_with_typed_variant() {
         return; // skip: real Claude Code creds found in keychain
     }
     let dir = tempdir().unwrap();
-    let orc = AuthOrchestrator::new(dir.path().to_path_buf(), None);
+    let exchange = TokenExchange::with_endpoint("http://127.0.0.1:1".to_string());
+    let identity = IdentityFetcher::with_endpoint("http://127.0.0.1:1".to_string());
+    let orc = AuthOrchestrator::with_collaborators(dir.path().to_path_buf(), None, exchange, identity);
     match orc.get_access_token().await {
         Err(AuthError::NoSource) => {}
         other => panic!("expected AuthError::NoSource, got {other:?}"),
