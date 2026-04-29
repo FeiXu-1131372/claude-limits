@@ -74,6 +74,7 @@ pub fn run() {
     let specta_builder = tauri_specta::Builder::<tauri::Wry>::new()
         .commands(tauri_specta::collect_commands![
             commands::get_current_usage,
+            commands::get_pricing,
             commands::get_session_history,
             commands::get_daily_trends,
             commands::get_model_breakdown,
@@ -97,6 +98,7 @@ pub fn run() {
     let specta_builder = tauri_specta::Builder::<tauri::Wry>::new()
         .commands(tauri_specta::collect_commands![
             commands::get_current_usage,
+            commands::get_pricing,
             commands::get_session_history,
             commands::get_daily_trends,
             commands::get_model_breakdown,

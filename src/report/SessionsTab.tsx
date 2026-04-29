@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -7,7 +7,8 @@ import { ChevronDown, ChevronRight, IconSessions } from '../lib/icons';
 import { ipc } from '../lib/ipc';
 import { useTabData } from '../lib/useTabData';
 import { useAppStore } from '../lib/store';
-import type { SessionEvent } from '../lib/types';
+import type { PricingEntry, SessionEvent } from '../lib/types';
+import { costPerCategory, lookupPricing } from '../lib/pricing';
 
 const MODEL_BADGE: Record<string, 'opus' | 'sonnet' | 'haiku' | 'default'> = {
   opus: 'opus',
@@ -54,6 +55,15 @@ interface AggregatedSession {
     cache_write_5m: number;
     cache_write_1h: number;
   };
+  /** Per-category cost contributions, summed over all turns. Mirrors the
+   * backend cost_for logic so totals match what's billed. */
+  cost_breakdown: {
+    input: number;
+    output: number;
+    cache_read: number;
+    cache_write_5m: number;
+    cache_write_1h: number;
+  };
 }
 
 /**
@@ -62,7 +72,10 @@ interface AggregatedSession {
  * session; the lines inside it are the conversation turns. Without this,
  * "5447 sessions" actually meant 5447 individual API calls.
  */
-function aggregateSessions(events: SessionEvent[]): AggregatedSession[] {
+function aggregateSessions(
+  events: SessionEvent[],
+  pricing: PricingEntry[] | null,
+): AggregatedSession[] {
   const byFile = new Map<string, AggregatedSession & { _modelTokens: Map<string, number> }>();
 
   for (const e of events) {
@@ -78,6 +91,13 @@ function aggregateSessions(events: SessionEvent[]): AggregatedSession[] {
         total_cost_usd: 0,
         dominant_model: e.model,
         breakdown: {
+          input: 0,
+          output: 0,
+          cache_read: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+        },
+        cost_breakdown: {
           input: 0,
           output: 0,
           cache_read: 0,
@@ -101,6 +121,27 @@ function aggregateSessions(events: SessionEvent[]): AggregatedSession[] {
       e.model,
       (agg._modelTokens.get(e.model) ?? 0) + e.output_tokens,
     );
+
+    // Per-category cost is computed per-turn so the Sonnet 1M-context
+    // tier (which switches based on the call's own context size, not the
+    // session total) is applied correctly.
+    if (pricing) {
+      const entry = lookupPricing(pricing, e.model);
+      if (entry) {
+        const c = costPerCategory(entry, {
+          input: e.input_tokens,
+          output: e.output_tokens,
+          cache_read: e.cache_read_tokens,
+          cache_5m: e.cache_creation_5m_tokens,
+          cache_1h: e.cache_creation_1h_tokens,
+        });
+        agg.cost_breakdown.input += c.input;
+        agg.cost_breakdown.output += c.output;
+        agg.cost_breakdown.cache_read += c.cache_read;
+        agg.cost_breakdown.cache_write_5m += c.cache_5m;
+        agg.cost_breakdown.cache_write_1h += c.cache_1h;
+      }
+    }
   }
 
   const result: AggregatedSession[] = [];
@@ -123,15 +164,25 @@ function aggregateSessions(events: SessionEvent[]): AggregatedSession[] {
   return result;
 }
 
-const BREAKDOWN_ROWS: Array<{ key: keyof AggregatedSession['breakdown']; label: string }> = [
-  { key: 'input', label: 'Input' },
-  { key: 'output', label: 'Output' },
-  { key: 'cache_read', label: 'Cache read' },
-  { key: 'cache_write_5m', label: 'Cache write (5m)' },
-  { key: 'cache_write_1h', label: 'Cache write (1h)' },
+const BREAKDOWN_ROWS: Array<{
+  key: keyof AggregatedSession['breakdown'];
+  costKey: keyof AggregatedSession['cost_breakdown'];
+  label: string;
+}> = [
+  { key: 'input', costKey: 'input', label: 'Input' },
+  { key: 'output', costKey: 'output', label: 'Output' },
+  { key: 'cache_read', costKey: 'cache_read', label: 'Cache read' },
+  { key: 'cache_write_5m', costKey: 'cache_write_5m', label: 'Cache write (5m)' },
+  { key: 'cache_write_1h', costKey: 'cache_write_1h', label: 'Cache write (1h)' },
 ];
 
-function BreakdownTable({ breakdown }: { breakdown: AggregatedSession['breakdown'] }) {
+function BreakdownTable({
+  breakdown,
+  costBreakdown,
+}: {
+  breakdown: AggregatedSession['breakdown'];
+  costBreakdown: AggregatedSession['cost_breakdown'];
+}) {
   // Hide rows with zero tokens — keeps the table tight, since most
   // sessions don't use the 1h cache tier at all.
   const rows = BREAKDOWN_ROWS.filter((r) => breakdown[r.key] > 0);
@@ -147,15 +198,18 @@ function BreakdownTable({ breakdown }: { breakdown: AggregatedSession['breakdown
         <div
           key={r.key}
           className={[
-            'flex items-center justify-between px-[var(--space-md)] py-[var(--space-xs)]',
+            'flex items-center justify-between gap-[var(--space-md)] px-[var(--space-md)] py-[var(--space-xs)]',
             i < rows.length - 1 ? 'border-b border-[var(--color-border-subtle)]' : '',
           ].join(' ')}
         >
-          <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
+          <span className="flex-1 text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
             {r.label}
           </span>
-          <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-secondary)] tabular-nums">
+          <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-secondary)] tabular-nums min-w-[64px] text-right">
             {formatTokens(breakdown[r.key])}
+          </span>
+          <span className="mono text-[length:var(--text-label)] text-[color:var(--color-text-muted)] tabular-nums min-w-[56px] text-right">
+            {formatCost(costBreakdown[r.costKey])}
           </span>
         </div>
       ))}
@@ -170,10 +224,20 @@ export function SessionsTab() {
     [version],
   );
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [pricing, setPricing] = useState<PricingEntry[] | null>(null);
+
+  // Pricing rates are static for the lifetime of the process; fetch once.
+  useEffect(() => {
+    let cancelled = false;
+    ipc.getPricing().then((p) => {
+      if (!cancelled) setPricing(p);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const sessions = useMemo(
-    () => aggregateSessions(events ?? []),
-    [events],
+    () => aggregateSessions(events ?? [], pricing),
+    [events, pricing],
   );
   const totalCost = useMemo(
     () => sessions.reduce((sum, s) => sum + s.total_cost_usd, 0),
@@ -262,7 +326,12 @@ export function SessionsTab() {
                   </span>
                 </div>
               </button>
-              {isOpen && <BreakdownTable breakdown={session.breakdown} />}
+              {isOpen && (
+                <BreakdownTable
+                  breakdown={session.breakdown}
+                  costBreakdown={session.cost_breakdown}
+                />
+              )}
             </div>
           );
         })}

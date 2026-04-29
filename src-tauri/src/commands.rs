@@ -51,6 +51,14 @@ pub async fn get_current_usage(state: State<'_, Arc<AppState>>) -> Result<Option
 
 #[command]
 #[specta::specta]
+pub async fn get_pricing(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<crate::jsonl_parser::pricing::PricingEntry>, String> {
+    Ok(state.pricing.entries().to_vec())
+}
+
+#[command]
+#[specta::specta]
 pub async fn get_session_history(
     days: u32,
     state: State<'_, Arc<AppState>>,

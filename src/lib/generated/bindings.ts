@@ -13,6 +13,14 @@ async getCurrentUsage() : Promise<Result<CachedUsage | null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async getPricing() : Promise<Result<PricingEntry[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_pricing") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async getSessionHistory(days: number) : Promise<Result<StoredSessionEvent[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_session_history", { days }) };
@@ -195,6 +203,14 @@ export type CachedUsage = { snapshot: UsageSnapshot; account_id: string; account
 export type DailyBucket = { date: string; input_tokens: number; output_tokens: number; cost_usd: number }
 export type ExtraUsage = { is_enabled: boolean; monthly_limit_cents?: number; used_credits_cents?: number; utilization?: number; resets_at: string | null }
 export type ModelStats = { model: string; input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_creation_tokens: number; cost_usd: number }
+export type PricingEntry = { prefix: string; input_per_mtok: number; output_per_mtok: number; cache_read_per_mtok: number; cache_5m_per_mtok: number; cache_1h_per_mtok: number; 
+/**
+ * Optional 1M-context tier (Sonnet 4 only at time of writing). When
+ * the per-call input-side context exceeds `above_tokens`, every rate
+ * in this block replaces the base rate for that call.
+ */
+tier?: PricingTier | null }
+export type PricingTier = { above_tokens: number; input_per_mtok: number; output_per_mtok: number; cache_read_per_mtok: number; cache_5m_per_mtok: number; cache_1h_per_mtok: number }
 export type ProjectStats = { project: string; session_count: number; total_cost_usd: number }
 export type Settings = { polling_interval_secs: number; thresholds: number[]; theme: string; launch_at_login: boolean; crash_reports: boolean; preferred_auth_source: AuthSource | null }
 export type StoredSessionEvent = { ts: string; project: string; model: string; input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_creation_5m_tokens: number; cache_creation_1h_tokens: number; cost_usd: number; source_file: string; source_line: number; 

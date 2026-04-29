@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, specta::Type)]
 pub struct PricingEntry {
     pub prefix: String,
     pub input_per_mtok: f64,
@@ -17,7 +17,7 @@ pub struct PricingEntry {
     pub tier: Option<PricingTier>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, specta::Type)]
 pub struct PricingTier {
     pub above_tokens: u64,
     pub input_per_mtok: f64,
@@ -52,6 +52,10 @@ impl PricingTable {
     pub fn bundled() -> Result<Self> {
         let raw = include_str!("../../pricing.json");
         Self::parse(raw)
+    }
+
+    pub fn entries(&self) -> &[PricingEntry] {
+        &self.entries
     }
 
     pub fn lookup(&self, model: &str) -> Option<&PricingEntry> {

@@ -8,6 +8,8 @@ export type {
   DailyBucket,
   ExtraUsage,
   ModelStats,
+  PricingEntry,
+  PricingTier,
   ProjectStats,
   Settings,
   UsageSnapshot,

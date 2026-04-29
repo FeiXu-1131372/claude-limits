@@ -9,6 +9,7 @@ async function unwrap<T>(r: Result<T, string>): Promise<T> {
 
 export const ipc = {
   getCurrentUsage: () => commands.getCurrentUsage().then(unwrap),
+  getPricing: () => commands.getPricing().then(unwrap),
   getSessionHistory: (days: number) => commands.getSessionHistory(days).then(unwrap),
   getDailyTrends: (days: number) => commands.getDailyTrends(days).then(unwrap),
   getModelBreakdown: (days: number) => commands.getModelBreakdown(days).then(unwrap),
