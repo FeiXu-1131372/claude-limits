@@ -36,8 +36,10 @@ fn draw_pie(pixmap: &mut Pixmap, cell_x: f32, pct: Option<f64>) {
 
     // Track ring (always drawn).
     let track_path = circle_path(RING_CX, RING_CY, RING_R);
-    let mut stroke = Stroke::default();
-    stroke.width = RING_STROKE;
+    let stroke = Stroke {
+        width: RING_STROKE,
+        ..Default::default()
+    };
     let mut paint = Paint::default();
     paint.set_color(shared::track());
     paint.anti_alias = true;
@@ -52,10 +54,12 @@ fn draw_pie(pixmap: &mut Pixmap, cell_x: f32, pct: Option<f64>) {
             let gap = circumference - filled;
 
             let arc_path = circle_path(RING_CX, RING_CY, RING_R);
-            let mut arc_stroke = Stroke::default();
-            arc_stroke.width = RING_STROKE;
-            arc_stroke.line_cap = tiny_skia::LineCap::Butt;
-            arc_stroke.dash = StrokeDash::new(vec![filled, gap], 0.0);
+            let arc_stroke = Stroke {
+                width: RING_STROKE,
+                line_cap: tiny_skia::LineCap::Butt,
+                dash: StrokeDash::new(vec![filled, gap], 0.0),
+                ..Default::default()
+            };
             let mut arc_paint = Paint::default();
             arc_paint.set_color(shared::arc_color(raw));
             arc_paint.anti_alias = true;

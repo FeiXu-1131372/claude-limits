@@ -10,8 +10,10 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 
 pub struct WatcherHandle {
-    _debouncer:
-        notify_debouncer_full::Debouncer<notify::RecommendedWatcher, notify_debouncer_full::FileIdMap>,
+    _debouncer: notify_debouncer_full::Debouncer<
+        notify::RecommendedWatcher,
+        notify_debouncer_full::RecommendedCache,
+    >,
 }
 
 pub fn start(

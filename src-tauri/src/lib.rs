@@ -134,7 +134,7 @@ pub fn run() {
             // the app's only UI surface and macOS places it correctly.
             #[cfg(target_os = "macos")]
             {
-                let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             }
 
             // Force the popover to its configured fixed size on every launch.

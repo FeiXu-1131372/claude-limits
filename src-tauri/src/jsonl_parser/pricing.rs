@@ -45,7 +45,7 @@ impl PricingTable {
     pub fn parse(raw: &str) -> Result<Self> {
         let f: PricingFile = serde_json::from_str(raw)?;
         let mut entries = f.pricing;
-        entries.sort_by(|a, b| b.prefix.len().cmp(&a.prefix.len()));
+        entries.sort_by_key(|e| std::cmp::Reverse(e.prefix.len()));
         Ok(Self { entries })
     }
 
