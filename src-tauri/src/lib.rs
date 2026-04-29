@@ -20,7 +20,10 @@ pub fn run() {
     let _log_guard = logging::init(log_dir.clone());
 
     let data_dir = store::default_dir();
-    let db_result = store::Db::open(&data_dir).expect("open db");
+    let db_result = store::Db::open(&data_dir).unwrap_or_else(|e| {
+        tracing::error!("fatal: cannot open or recover the database: {e}");
+        std::process::exit(1);
+    });
     let db_recovered = db_result.recovered;
     let db = Arc::new(db_result);
     let pricing = Arc::new(jsonl_parser::PricingTable::bundled().expect("pricing"));
