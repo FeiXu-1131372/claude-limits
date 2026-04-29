@@ -71,7 +71,7 @@ export function CacheTab() {
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="mono text-[28px] font-[var(--weight-semibold)] text-[color:var(--color-accent)] leading-[var(--leading-display)]">
+            <span className="mono text-[length:var(--text-display)] font-[var(--weight-semibold)] text-[color:var(--color-accent)] leading-[var(--leading-display)]">
               {Math.round(hitRatePct)}%
             </span>
             <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">cache hit rate</span>

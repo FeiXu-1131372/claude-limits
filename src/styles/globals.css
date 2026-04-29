@@ -137,8 +137,8 @@ body[data-view-mode="compact"] #root {
   *,
   *::before,
   *::after {
-    animation-duration: var(--duration-instant) !important;
-    transition-duration: var(--duration-instant) !important;
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
   }
 }
 
