@@ -150,6 +150,6 @@ impl AuthOrchestrator {
             email: String::new(),
             display_name: None,
         };
-        Ok((tok.access_token, source, acc))
+        Ok((tok.access_token.clone(), source, acc))
     }
 }

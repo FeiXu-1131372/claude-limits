@@ -38,6 +38,7 @@ keyring = { version = "3", features = ["apple-native", "windows-native", "sync-s
 base64 = "0.22"
 sha2 = "0.10"
 rand = "0.8"
+zeroize = { version = "1", features = ["zeroize_derive"] }
 anyhow = "1"
 thiserror = "2"
 tracing = "0.1"

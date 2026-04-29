@@ -3,6 +3,7 @@ use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use rand::RngCore;
 use sha2::{Digest, Sha256};
 use url::Url;
+use zeroize::ZeroizeOnDrop;
 
 pub const CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 pub const AUTHORIZE_URL: &str = "https://claude.ai/oauth/authorize";
@@ -10,7 +11,7 @@ pub const TOKEN_URL: &str = "https://console.anthropic.com/v1/oauth/token";
 pub const REDIRECT_URI: &str = "https://console.anthropic.com/oauth/code/callback";
 pub const SCOPES: &str = "user:profile user:inference";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ZeroizeOnDrop)]
 pub struct PkcePair {
     pub verifier: String,
     pub challenge: String,
