@@ -1,9 +1,13 @@
 use super::{
-    account_identity::IdentityFetcher, claude_code_creds, exchange::TokenExchange, token_store,
-    AccountId, AuthSource, StoredToken,
+    account_identity::{IdentityFetcher, UserInfo}, claude_code_creds, exchange::TokenExchange,
+    oauth_paste_back::PkcePair, token_store, AccountId, AuthSource, StoredToken,
 };
 use chrono::{Duration, Utc};
+use parking_lot::RwLock;
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::{Duration as StdDuration, Instant};
 use thiserror::Error;
 use tokio::sync::Mutex;
 
@@ -33,20 +37,34 @@ pub struct AccountInfo {
     pub display_name: Option<String>,
 }
 
+const IDENTITY_CACHE_TTL: StdDuration = StdDuration::from_secs(3600);
+
 pub struct AuthOrchestrator {
     pub fallback_dir: PathBuf,
     pub exchange: TokenExchange,
     pub identity: IdentityFetcher,
     pub preferred_source: Mutex<Option<AuthSource>>,
+    identity_cache: Mutex<HashMap<AuthSource, (UserInfo, Instant)>>,
+    /// In-flight PKCE session for the OAuth paste-back flow.  Set by
+    /// `start_oauth_flow`, consumed by `submit_oauth_code`, and cleared by
+    /// `sign_out`.  Stored here (not in `AppState`) because it is purely an
+    /// auth-layer concern.
+    pub pending_oauth: RwLock<Option<(PkcePair, Instant)>>,
 }
 
 impl AuthOrchestrator {
-    pub fn new(fallback_dir: PathBuf, preferred_source: Option<AuthSource>) -> Self {
+    pub fn new(
+        fallback_dir: PathBuf,
+        preferred_source: Option<AuthSource>,
+        client: Arc<reqwest::Client>,
+    ) -> Self {
         Self {
             fallback_dir,
-            exchange: TokenExchange::new(),
-            identity: IdentityFetcher::new(),
+            exchange: TokenExchange::new(client.clone()),
+            identity: IdentityFetcher::new(client),
             preferred_source: Mutex::new(preferred_source),
+            identity_cache: Mutex::new(HashMap::new()),
+            pending_oauth: RwLock::new(None),
         }
     }
 
@@ -64,6 +82,8 @@ impl AuthOrchestrator {
             exchange,
             identity,
             preferred_source: Mutex::new(preferred_source),
+            identity_cache: Mutex::new(HashMap::new()),
+            pending_oauth: RwLock::new(None),
         }
     }
 
@@ -109,8 +129,8 @@ impl AuthOrchestrator {
                 let refreshed_oauth = self.refresh_if_needed(oauth_tok).await?;
                 let refreshed_cli = self.refresh_if_needed(cli_tok).await?;
                 match (
-                    self.identity.fetch(&refreshed_oauth.access_token).await,
-                    self.identity.fetch(&refreshed_cli.access_token).await,
+                    self.fetch_identity(AuthSource::OAuth, &refreshed_oauth.access_token).await,
+                    self.fetch_identity(AuthSource::ClaudeCode, &refreshed_cli.access_token).await,
                 ) {
                     (Ok(oauth_info), Ok(cli_info)) if oauth_info.id != cli_info.id => {
                         // Confirmed two different accounts — surface the conflict.
@@ -140,6 +160,20 @@ impl AuthOrchestrator {
 
     pub async fn set_preferred_source(&self, src: AuthSource) {
         *self.preferred_source.lock().await = Some(src);
+    }
+
+    async fn fetch_identity(&self, source: AuthSource, token: &str) -> anyhow::Result<UserInfo> {
+        {
+            let cache = self.identity_cache.lock().await;
+            if let Some((info, fetched_at)) = cache.get(&source) {
+                if fetched_at.elapsed() < IDENTITY_CACHE_TTL {
+                    return Ok(info.clone());
+                }
+            }
+        }
+        let info = self.identity.fetch(token).await?;
+        self.identity_cache.lock().await.insert(source, (info.clone(), Instant::now()));
+        Ok(info)
     }
 
     async fn refresh_if_needed(&self, tok: StoredToken) -> AuthResult<StoredToken> {

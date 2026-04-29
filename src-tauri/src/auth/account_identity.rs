@@ -1,11 +1,12 @@
 use super::AccountId;
 use anyhow::{anyhow, Result};
 use serde::Deserialize;
+use std::sync::Arc;
 
 pub const USERINFO_URL: &str = "https://api.anthropic.com/api/oauth/userinfo";
 const ANTHROPIC_BETA: &str = "oauth-2025-04-20";
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct UserInfo {
     #[serde(rename = "sub")]
     pub id: String,
@@ -15,27 +16,22 @@ pub struct UserInfo {
 
 pub struct IdentityFetcher {
     endpoint: String,
-    client: reqwest::Client,
-}
-
-impl Default for IdentityFetcher {
-    fn default() -> Self {
-        Self::new()
-    }
+    client: Arc<reqwest::Client>,
 }
 
 impl IdentityFetcher {
-    pub fn new() -> Self {
+    pub fn new(client: Arc<reqwest::Client>) -> Self {
         Self {
             endpoint: USERINFO_URL.to_string(),
-            client: reqwest::Client::new(),
+            client,
         }
     }
 
+    /// Test-only constructor: builds a fresh client pointed at a mock endpoint.
     pub fn with_endpoint(endpoint: String) -> Self {
         Self {
             endpoint,
-            client: reqwest::Client::new(),
+            client: Arc::new(reqwest::Client::new()),
         }
     }
 

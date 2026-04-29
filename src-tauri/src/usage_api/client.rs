@@ -2,6 +2,7 @@ use super::types::UsageSnapshot;
 use anyhow::Result;
 use chrono::Utc;
 use reqwest::{Client, StatusCode};
+use std::sync::Arc;
 use std::time::Duration;
 
 pub const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
@@ -17,21 +18,17 @@ pub enum FetchOutcome {
 
 pub struct UsageClient {
     base_url: String,
-    inner: Client,
+    inner: Arc<Client>,
     app_version: String,
 }
 
 impl UsageClient {
-    pub fn new(app_version: String) -> Result<Self> {
-        let inner = Client::builder()
-            .timeout(Duration::from_secs(30))
-            .connect_timeout(Duration::from_secs(10))
-            .build()?;
-        Ok(Self {
+    pub fn new(client: Arc<Client>, app_version: String) -> Self {
+        Self {
             base_url: USAGE_URL.to_string(),
-            inner,
+            inner: client,
             app_version,
-        })
+        }
     }
 
     pub fn with_base_url(base_url: String, app_version: String) -> Result<Self> {
@@ -40,7 +37,7 @@ impl UsageClient {
             .build()?;
         Ok(Self {
             base_url,
-            inner,
+            inner: Arc::new(inner),
             app_version,
         })
     }

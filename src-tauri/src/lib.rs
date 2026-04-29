@@ -27,8 +27,20 @@ pub fn run() {
     let db_recovered = db_result.recovered;
     let db = Arc::new(db_result);
     let pricing = Arc::new(jsonl_parser::PricingTable::bundled().expect("pricing"));
+
+    // One shared HTTP client for all outbound requests (usage API, token
+    // exchange, and identity fetcher).  Built once with the canonical timeout
+    // configuration so every caller benefits from connection-pool reuse.
+    let http_client = Arc::new(
+        reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .build()
+            .expect("http client"),
+    );
+
     let usage_client = Arc::new(
-        usage_api::UsageClient::new(env!("CARGO_PKG_VERSION").to_string()).expect("client"),
+        usage_api::UsageClient::new(http_client.clone(), env!("CARGO_PKG_VERSION").to_string()),
     );
 
     let persisted_settings = db
@@ -42,6 +54,7 @@ pub fn run() {
     let auth = Arc::new(auth::AuthOrchestrator::new(
         data_dir.clone(),
         persisted_settings.preferred_auth_source,
+        http_client,
     ));
 
     let app_state = Arc::new(AppState {
@@ -51,10 +64,8 @@ pub fn run() {
         pricing: pricing.clone(),
         settings: parking_lot::RwLock::new(persisted_settings),
         cached_usage: parking_lot::RwLock::new(None),
-        pending_oauth: parking_lot::RwLock::new(None),
         fallback_dir: data_dir.clone(),
         force_refresh: tokio::sync::Notify::new(),
-        recent_five_hour: parking_lot::RwLock::new(std::collections::VecDeque::new()),
     });
 
     // tauri-specta's Builder::commands replaces previously registered commands rather
@@ -110,7 +121,8 @@ pub fn run() {
     specta_builder
         .export(
             specta_typescript::Typescript::default()
-                .bigint(specta_typescript::BigIntExportBehavior::Number),
+                .bigint(specta_typescript::BigIntExportBehavior::Number)
+                .header("// @ts-nocheck"),
             "../src/lib/generated/bindings.ts",
         )
         .expect("failed to export specta bindings");

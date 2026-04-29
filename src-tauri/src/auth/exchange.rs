@@ -3,6 +3,7 @@ use super::StoredToken;
 use anyhow::{anyhow, Result};
 use chrono::{Duration, Utc};
 use serde::Deserialize;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 struct TokenResponse {
@@ -15,27 +16,22 @@ struct TokenResponse {
 
 pub struct TokenExchange {
     endpoint: String,
-    client: reqwest::Client,
-}
-
-impl Default for TokenExchange {
-    fn default() -> Self {
-        Self::new()
-    }
+    client: Arc<reqwest::Client>,
 }
 
 impl TokenExchange {
-    pub fn new() -> Self {
+    pub fn new(client: Arc<reqwest::Client>) -> Self {
         Self {
             endpoint: TOKEN_URL.to_string(),
-            client: reqwest::Client::new(),
+            client,
         }
     }
 
+    /// Test-only constructor: builds a fresh client pointed at a mock endpoint.
     pub fn with_endpoint(endpoint: String) -> Self {
         Self {
             endpoint,
-            client: reqwest::Client::new(),
+            client: Arc::new(reqwest::Client::new()),
         }
     }
 
