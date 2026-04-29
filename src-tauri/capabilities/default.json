@@ -18,6 +18,9 @@
     "dialog:default",
     "notification:default",
     "os:default",
-    "shell:default"
+    "shell:default",
+    "updater:default",
+    "updater:allow-check",
+    "updater:allow-download-and-install"
   ]
 }
