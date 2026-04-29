@@ -3,70 +3,44 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const KEYRING_SERVICE: &str = "claude-limits";
-const KEYRING_USER: &str = "oauth_refresh";
-
-/// Whether to use the OS keychain for OAuth-token persistence.
-///
-/// In debug builds we deliberately skip the keychain and use the
-/// permissions-restricted fallback file only. The macOS keychain ACL is
-/// bound to the calling binary's code signature; every `cargo build`
-/// produces a slightly different unsigned binary, so the previous
-/// "Always Allow" the user clicked stops applying and the OS prompts
-/// again on every restart. That makes the dev loop unusable.
-///
-/// Release builds (which we expect to be code-signed and notarised in
-/// CI before shipping) keep the keychain path so production users get
-/// hardware-backed encryption-at-rest.
-fn use_keychain() -> bool {
-    !cfg!(debug_assertions)
-}
+// We deliberately do NOT use the OS keychain (Keychain Access on macOS,
+// Credential Manager on Windows, Secret Service on Linux) for the OAuth
+// refresh token. Reasons:
+//
+//   1. macOS prompt on every rebuild. Keychain ACLs are bound to the
+//      calling binary's code signature. An unsigned (or ad-hoc-signed)
+//      open-source app gets a different signature on each `cargo build`,
+//      and the user's "Always Allow" stops applying. Every restart shows
+//      a "claude-limits wants to use your confidential information"
+//      prompt asking for the login keychain password — which to a
+//      privacy-conscious user looks indistinguishable from malware
+//      asking for credentials.
+//
+//   2. The threat model the keychain protects against is largely already
+//      covered. FileVault (default on every macOS install since Big Sur)
+//      encrypts the home directory at rest. POSIX mode-0600 (and the
+//      Windows ACL grant we apply) prevents other local users from
+//      reading the file. Root can read either the keychain or the file
+//      regardless. For an attacker without root and without a logged-in
+//      session, both are equally inaccessible.
+//
+//   3. Code that doesn't run can't break. The previous keyring-first
+//      logic carried two latent bugs (refresh writing CLI tokens into
+//      the OAuth slot; per-rebuild prompts). Routing through a single
+//      well-understood path eliminates both classes.
+//
+// The token lives at `<app-data-dir>/credentials.json` with mode 0o600
+// on Unix and a single-user-grant ACL on Windows.
 
 pub async fn save(token: &StoredToken, fallback_dir: &Path) -> Result<()> {
-    if !use_keychain() {
-        return save_fallback(token, fallback_dir).await;
-    }
-    let payload = serde_json::to_string(token)?;
-    match keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER) {
-        Ok(entry) => match entry.set_password(&payload) {
-            Ok(_) => {
-                let _ = fs::remove_file(fallback_path(fallback_dir));
-                Ok(())
-            }
-            Err(e) => {
-                tracing::warn!("keyring save failed ({e}); falling back to restricted file");
-                save_fallback(token, fallback_dir).await
-            }
-        },
-        Err(e) => {
-            tracing::warn!("keyring unavailable ({e}); using restricted file");
-            save_fallback(token, fallback_dir).await
-        }
-    }
+    save_fallback(token, fallback_dir).await
 }
 
 pub fn load(fallback_dir: &Path) -> Result<Option<StoredToken>> {
-    if !use_keychain() {
-        return load_fallback(fallback_dir);
-    }
-    if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER) {
-        if let Ok(s) = entry.get_password() {
-            if let Ok(t) = serde_json::from_str::<StoredToken>(&s) {
-                return Ok(Some(t));
-            }
-        }
-    }
     load_fallback(fallback_dir)
 }
 
 pub fn clear(fallback_dir: &Path) -> Result<()> {
-    // Even in debug, attempt to clear any keyring entry left by a prior
-    // release build so the user isn't stuck with stale creds across
-    // build profiles. delete_credential doesn't prompt — it's a metadata
-    // operation, unlike get_password.
-    if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER) {
-        let _ = entry.delete_credential();
-    }
     let p = fallback_path(fallback_dir);
     let _ = fs::remove_file(p);
     Ok(())
