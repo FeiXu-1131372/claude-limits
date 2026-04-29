@@ -22,8 +22,8 @@ pub enum UpdatePhase {
     Install,
 }
 
-#[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum UpdateOutcome {
     UpToDate,
     Ready { version: String },
