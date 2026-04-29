@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { invoke } from '@tauri-apps/api/core';
 import { Banner } from '../components/ui/Banner';
 import { IconButton } from '../components/ui/IconButton';
+import { UpdateBanner } from '../components/UpdateBanner';
 import { UsageSummary } from '../components/UsageSummary';
 import { SettingsPanel } from '../settings/SettingsPanel';
 import { useAppStore } from '../lib/store';
+import { useUpdateStore } from '../state/updateStore';
 import { ipc } from '../lib/ipc';
 import { IconRefresh, IconSettings, ChevronRight, X, IconExpand } from '../lib/icons';
 import { handleDragStart, closeWindow } from '../lib/window-chrome';
@@ -67,6 +70,7 @@ export function CompactPopover() {
 
   return (
     <Shell>
+      <UpdateBanner />
       <ChromeBar
         live
         stale={stale}
@@ -97,16 +101,17 @@ export function CompactPopover() {
 
       <UsageSummary usage={usage} thresholds={[warn, danger]} />
 
-      {/* Footer: timestamp + ghost link to expanded report. Explicit inline
-       * marginTop: auto because Tailwind's `mt-auto` utility wasn't being
-       * picked up here — this is more robust than depending on JIT. */}
+      {/* Footer: timestamp left, version + check-for-updates right. Explicit
+       * inline marginTop: auto because Tailwind's `mt-auto` utility wasn't
+       * being picked up here — this is more robust than depending on JIT. */}
       <div
         style={{ marginTop: 'auto' }}
-        className="flex items-center px-[var(--popover-pad)] py-[var(--space-sm)] border-t border-[var(--color-rule)]"
+        className="flex items-center justify-between gap-2 px-[var(--popover-pad)] py-[var(--space-sm)] border-t border-[var(--color-rule)]"
       >
         <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
           Updated {updatedAgo || '—'}
         </span>
+        <VersionFooter />
       </div>
     </Shell>
   );
@@ -312,6 +317,60 @@ function StatusDot({ live, stale }: { live: boolean; stale: boolean }) {
         className="relative inline-block h-[6px] w-[6px] rounded-full"
         style={{ background: 'var(--color-accent)' }}
       />
+    </span>
+  );
+}
+
+/**
+ * Right side of the footer — shows current version and a transient
+ * "Check for updates" link that reflects the live update status.
+ */
+function VersionFooter() {
+  const status = useUpdateStore((s) => s.status);
+  const [transient, setTransient] = useState<null | 'checking' | 'up-to-date' | 'failed'>(null);
+
+  useEffect(() => {
+    if (status === 'checking') {
+      setTransient('checking');
+      return;
+    }
+    if (status === 'up-to-date') {
+      setTransient('up-to-date');
+      const t = setTimeout(() => setTransient(null), 3000);
+      return () => clearTimeout(t);
+    }
+    if (status === 'failed') {
+      setTransient('failed');
+      const t = setTimeout(() => setTransient(null), 3000);
+      return () => clearTimeout(t);
+    }
+    setTransient(null);
+  }, [status]);
+
+  const label =
+    transient === 'checking' ? 'Checking…'
+    : transient === 'up-to-date' ? 'Up to date'
+    : transient === 'failed' ? "Couldn't check"
+    : 'Check for updates';
+
+  const isChecking = transient === 'checking';
+
+  const onClick = () => {
+    if (isChecking) return;
+    invoke('check_for_updates_now').catch(() => {/* error arrives via event */});
+  };
+
+  return (
+    <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)] select-none">
+      v{__APP_VERSION__}{' · '}
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={isChecking}
+        className="underline-offset-2 hover:underline hover:text-[color:var(--color-accent)] transition-colors disabled:opacity-60"
+      >
+        {label}
+      </button>
     </span>
   );
 }
