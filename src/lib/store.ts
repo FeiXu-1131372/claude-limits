@@ -1,8 +1,13 @@
 import { create } from 'zustand';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import type { UnlistenFn } from '@tauri-apps/api/event';
 import { ipc } from './ipc';
 import { subscribe, type AppEvent } from './events';
 import type { CachedUsage, Settings } from './types';
+
+// Module-level unlistener registry. Lives outside the store to avoid
+// serialization and to survive HMR / React strict-mode double-invocations.
+let _unlisteners: UnlistenFn[] = [];
 
 interface AppStore {
   usage: CachedUsage | null;
@@ -21,6 +26,7 @@ interface AppStore {
   viewMode: 'compact' | 'expanded';
 
   init: () => Promise<void>;
+  cleanup: () => void;
   refreshSettings: () => Promise<void>;
   setSettings: (s: Settings) => Promise<void>;
   refreshUsage: () => Promise<void>;
@@ -41,6 +47,13 @@ export const useAppStore = create<AppStore>((set, _get) => ({
   viewMode: 'compact',
 
   async init() {
+    // Tear down any listeners from a previous init() call (React strict-mode
+    // double-invocation, HMR) so handlers don't accumulate.
+    if (_unlisteners.length > 0) {
+      _unlisteners.forEach((fn) => fn());
+      _unlisteners = [];
+    }
+
     const [usage, settings, hasClaudeCodeCreds] = await Promise.all([
       ipc.getCurrentUsage(),
       ipc.getSettings(),
@@ -48,7 +61,7 @@ export const useAppStore = create<AppStore>((set, _get) => ({
     ]);
     set({ usage, settings, hasClaudeCodeCreds });
 
-    await subscribe((e: AppEvent) => {
+    _unlisteners = await subscribe((e: AppEvent) => {
       switch (e.type) {
         case 'usage_updated':
           set({ usage: e.payload, authRequired: false, stale: false });
@@ -91,6 +104,11 @@ export const useAppStore = create<AppStore>((set, _get) => ({
     } catch {
       // Outside Tauri (e.g. localhost demo page) — no focus tracking.
     }
+  },
+
+  cleanup() {
+    _unlisteners.forEach((fn) => fn());
+    _unlisteners = [];
   },
 
   async refreshSettings() {
