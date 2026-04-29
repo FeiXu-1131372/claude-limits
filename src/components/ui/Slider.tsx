@@ -23,10 +23,11 @@ export const Slider = forwardRef<HTMLInputElement, SliderProps>(
     ...props
   }, ref) => {
     const id = useId();
+    const controlled = controlledValue !== undefined;
     const [internalValue, setInternalValue] = useState(
-      Number(controlledValue ?? defaultValue ?? min),
+      Number(defaultValue ?? min),
     );
-    const value = controlledValue != null ? Number(controlledValue) : internalValue;
+    const value = controlled ? Number(controlledValue) : internalValue;
 
     const pct = ((value - min) / (max - min)) * 100;
 
@@ -53,13 +54,14 @@ export const Slider = forwardRef<HTMLInputElement, SliderProps>(
             step={step}
             value={value}
             onChange={(e) => {
-              setInternalValue(Number(e.target.value));
+              if (!controlled) setInternalValue(Number(e.target.value));
               onChange?.(e);
             }}
             className={[
               'w-full h-[5px] appearance-none rounded-[var(--radius-pill)]',
               'bg-[var(--color-track)] outline-none',
               'cursor-pointer',
+              'focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-1',
               '[&::-webkit-slider-thumb]:appearance-none',
               '[&::-webkit-slider-thumb]:w-[16px] [&::-webkit-slider-thumb]:h-[16px]',
               '[&::-webkit-slider-thumb]:rounded-full',
@@ -70,8 +72,6 @@ export const Slider = forwardRef<HTMLInputElement, SliderProps>(
               '[&::-webkit-slider-thumb]:ease-[var(--ease-spring)]',
               '[&::-webkit-slider-thumb]:hover:scale-110',
               '[&::-webkit-slider-thumb]:active:scale-95',
-              '[&::-webkit-slider-thumb]:focus-visible:outline-2',
-              '[&::-webkit-slider-thumb]:focus-visible:outline-[var(--color-border-focus)]',
             ].join(' ')}
             style={{
               background: `linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${pct}%, var(--color-track) ${pct}%, var(--color-track) 100%)`,

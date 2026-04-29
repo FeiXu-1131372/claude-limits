@@ -61,7 +61,9 @@ function TabsComponent({
         }
         if (child.type === TabPanel) {
           const panel = child as React.ReactElement<TabPanelProps>;
-          return panel.props.id === activeTab ? panel : null;
+          return cloneElement(panel, {
+            hidden: panel.props.id !== activeTab || undefined,
+          });
         }
         return child;
       })}
