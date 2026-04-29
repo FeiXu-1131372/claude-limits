@@ -48,11 +48,10 @@ impl IdentityFetcher {
             .send()
             .await?;
         if !resp.status().is_success() {
-            return Err(anyhow!(
-                "userinfo {}: {}",
-                resp.status(),
-                resp.text().await.unwrap_or_default()
-            ));
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            tracing::debug!("userinfo error body: {text}");
+            return Err(anyhow!("userinfo failed: {status}"));
         }
         Ok(resp.json().await?)
     }

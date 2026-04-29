@@ -51,7 +51,8 @@ impl TokenExchange {
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(anyhow!("token exchange failed: {status}: {text}"));
+            tracing::debug!("token exchange error body: {text}");
+            return Err(anyhow!("token exchange failed: {status}"));
         }
         let tr: TokenResponse = resp.json().await?;
         Ok(StoredToken {
@@ -71,7 +72,8 @@ impl TokenExchange {
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(anyhow!("refresh failed: {status}: {text}"));
+            tracing::debug!("token refresh error body: {text}");
+            return Err(anyhow!("refresh failed: {status}"));
         }
         let tr: TokenResponse = resp.json().await?;
         Ok(StoredToken {
