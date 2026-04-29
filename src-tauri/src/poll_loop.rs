@@ -47,8 +47,9 @@ pub fn spawn(handle: AppHandle, state: Arc<AppState>) {
                     STALE_EMITTED.store(false, Ordering::Relaxed);
                     backoff = Duration::from_secs(60);
                 }
-                PollResult::Backoff => {
-                    tokio::time::sleep(backoff).await;
+                PollResult::Backoff(retry_after) => {
+                    let wait = retry_after.unwrap_or(backoff);
+                    tokio::time::sleep(wait).await;
                     backoff = next_backoff(backoff);
                 }
                 PollResult::Transient => {}
@@ -59,7 +60,8 @@ pub fn spawn(handle: AppHandle, state: Arc<AppState>) {
 
 enum PollResult {
     Ok,
-    Backoff,
+    /// Server asked us to back off. Carries the `Retry-After` hint when present.
+    Backoff(Option<Duration>),
     Transient,
 }
 
@@ -160,13 +162,10 @@ async fn poll_once(
             let _ = handle.emit("auth_required", ());
             PollResult::Transient
         }
-        FetchOutcome::RateLimited => {
+        FetchOutcome::RateLimited(retry_after) => {
             tracing::warn!("usage api rate-limited; backing off");
-            // Like Transient: surface a placeholder so the popover shows the
-            // stale banner with a clear message instead of being stuck on the
-            // Loading screen indefinitely while the backoff ladder runs.
             emit_error_placeholder(handle, state, &account, source, "rate-limited (429)");
-            PollResult::Backoff
+            PollResult::Backoff(retry_after)
         }
         FetchOutcome::Transient(e) => {
             tracing::warn!("usage api transient error: {e}");

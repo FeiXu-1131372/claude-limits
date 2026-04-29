@@ -12,7 +12,8 @@ pub const ANTHROPIC_BETA: &str = "oauth-2025-04-20";
 pub enum FetchOutcome {
     Ok(UsageSnapshot),
     Unauthorized,
-    RateLimited,
+    /// Server returned 429. Carries the `Retry-After` delay when the header is present.
+    RateLimited(Option<Duration>),
     Transient(String),
 }
 
@@ -81,8 +82,17 @@ impl UsageClient {
                 FetchOutcome::Unauthorized
             }
             StatusCode::TOO_MANY_REQUESTS => {
-                tracing::warn!("usage fetch returned 429 rate-limited");
-                FetchOutcome::RateLimited
+                let retry_after = resp
+                    .headers()
+                    .get("retry-after")
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .map(Duration::from_secs);
+                tracing::warn!(
+                    "usage fetch returned 429 rate-limited; retry-after={:?}",
+                    retry_after
+                );
+                FetchOutcome::RateLimited(retry_after)
             }
             s if s.is_server_error() => {
                 tracing::warn!("usage fetch server error: {s}");

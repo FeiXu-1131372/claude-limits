@@ -6,7 +6,26 @@ use std::path::{Path, PathBuf};
 const KEYRING_SERVICE: &str = "claude-limits";
 const KEYRING_USER: &str = "oauth_refresh";
 
+/// Whether to use the OS keychain for OAuth-token persistence.
+///
+/// In debug builds we deliberately skip the keychain and use the
+/// permissions-restricted fallback file only. The macOS keychain ACL is
+/// bound to the calling binary's code signature; every `cargo build`
+/// produces a slightly different unsigned binary, so the previous
+/// "Always Allow" the user clicked stops applying and the OS prompts
+/// again on every restart. That makes the dev loop unusable.
+///
+/// Release builds (which we expect to be code-signed and notarised in
+/// CI before shipping) keep the keychain path so production users get
+/// hardware-backed encryption-at-rest.
+fn use_keychain() -> bool {
+    !cfg!(debug_assertions)
+}
+
 pub async fn save(token: &StoredToken, fallback_dir: &Path) -> Result<()> {
+    if !use_keychain() {
+        return save_fallback(token, fallback_dir).await;
+    }
     let payload = serde_json::to_string(token)?;
     match keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER) {
         Ok(entry) => match entry.set_password(&payload) {
@@ -27,6 +46,9 @@ pub async fn save(token: &StoredToken, fallback_dir: &Path) -> Result<()> {
 }
 
 pub fn load(fallback_dir: &Path) -> Result<Option<StoredToken>> {
+    if !use_keychain() {
+        return load_fallback(fallback_dir);
+    }
     if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER) {
         if let Ok(s) = entry.get_password() {
             if let Ok(t) = serde_json::from_str::<StoredToken>(&s) {
@@ -38,6 +60,10 @@ pub fn load(fallback_dir: &Path) -> Result<Option<StoredToken>> {
 }
 
 pub fn clear(fallback_dir: &Path) -> Result<()> {
+    // Even in debug, attempt to clear any keyring entry left by a prior
+    // release build so the user isn't stuck with stale creds across
+    // build profiles. delete_credential doesn't prompt — it's a metadata
+    // operation, unlike get_password.
     if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER) {
         let _ = entry.delete_credential();
     }
