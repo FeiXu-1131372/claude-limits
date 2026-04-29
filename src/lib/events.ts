@@ -10,7 +10,8 @@ export type AppEvent =
       payload: { oauth_email: string; cli_email: string };
     }
   | { type: "stale_data" }
-  | { type: "db_reset" };
+  | { type: "db_reset" }
+  | { type: "popover_hidden" };
 
 export function subscribe(
   handler: (e: AppEvent) => void,
@@ -30,5 +31,6 @@ export function subscribe(
     ),
     listen("stale_data", () => handler({ type: "stale_data" })),
     listen("db_reset", () => handler({ type: "db_reset" })),
+    listen("popover_hidden", () => handler({ type: "popover_hidden" })),
   ]);
 }

@@ -68,6 +68,10 @@ export const useAppStore = create<AppStore>((set, _get) => ({
         case 'db_reset':
           set({ dbReset: true });
           break;
+        case 'popover_hidden':
+          set({ viewMode: 'compact' });
+          ipc.resizeWindow('compact').catch(() => {});
+          break;
       }
     });
 

@@ -79,7 +79,7 @@ export function SessionsTab() {
       </div>
 
       <div className="flex flex-col">
-        {events.map((session, i) => {
+        {events.slice(0, 100).map((session, i) => {
           const total = session.input_tokens + session.output_tokens;
           const key = modelKey(session.model);
           return (
@@ -118,6 +118,11 @@ export function SessionsTab() {
             </div>
           );
         })}
+        {events.length > 100 && (
+          <div className="py-[var(--space-md)] text-center text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
+            Showing latest 100 sessions.
+          </div>
+        )}
       </div>
     </div>
   );
