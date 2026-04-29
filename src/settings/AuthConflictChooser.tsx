@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { IconButton } from '../components/ui/IconButton';
@@ -9,11 +10,17 @@ import { handleDragStart, closeWindow } from '../lib/window-chrome';
 export function AuthConflictChooser() {
   const conflict = useAppStore((s) => s.conflict);
   const dismiss = useAppStore((s) => s.dismissBanner);
+  const [error, setError] = useState<string | null>(null);
   if (!conflict) return null;
 
   async function pick(source: 'OAuth' | 'ClaudeCode') {
-    await ipc.pickAuthSource(source);
-    dismiss('conflict');
+    setError(null);
+    try {
+      await ipc.pickAuthSource(source);
+      dismiss('conflict');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to select account. Please try again.');
+    }
   }
 
   return (
@@ -45,6 +52,11 @@ export function AuthConflictChooser() {
               <span className="opacity-60">(Claude Code)</span>
             </Button>
           </div>
+          {error && (
+            <p className="text-[length:var(--text-label)] text-[color:var(--color-danger)]">
+              {error}
+            </p>
+          )}
         </div>
       </Card>
     </div>
