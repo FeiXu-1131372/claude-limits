@@ -37,16 +37,15 @@ export function AuthPanel() {
       setError(toMessage(e, 'Failed to start sign-in.'));
       return;
     }
-    setAuthorizeUrl(url);
-    setStep('paste');
     try {
       await openUrl(url);
     } catch (e) {
-      // Browser open failed — user can still copy the URL we just exposed.
       setError(
         `Could not open your browser (${toMessage(e, 'unknown error')}). Copy the link below and open it manually.`,
       );
     }
+    setAuthorizeUrl(url);
+    setStep('paste');
   }
 
   async function submit() {
