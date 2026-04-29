@@ -162,43 +162,55 @@ async fn poll_once(
         }
         FetchOutcome::RateLimited => {
             tracing::warn!("usage api rate-limited; backing off");
+            // Like Transient: surface a placeholder so the popover shows the
+            // stale banner with a clear message instead of being stuck on the
+            // Loading screen indefinitely while the backoff ladder runs.
+            emit_error_placeholder(handle, state, &account, source, "rate-limited (429)");
             PollResult::Backoff
         }
         FetchOutcome::Transient(e) => {
             tracing::warn!("usage api transient error: {e}");
-            // On the very first poll, cached_usage is None and the previous
-            // implementation dropped the error here — leaving the popover in
-            // an indefinite "Loading…" state with nothing in logs and no
-            // event to the frontend. Synthesize an empty placeholder so the
-            // popover can render its normal layout (em-dashes for missing
-            // numbers) plus the stale banner driven by last_error.
-            let placeholder = state.cached_usage.read().clone().map_or_else(
-                || CachedUsage {
-                    snapshot: UsageSnapshot {
-                        five_hour: None,
-                        seven_day: None,
-                        seven_day_sonnet: None,
-                        seven_day_opus: None,
-                        extra_usage: None,
-                        fetched_at: Utc::now(),
-                        unknown: Default::default(),
-                    },
-                    account_id: account.id.0.clone(),
-                    account_email: account.email.clone(),
-                    last_error: Some(e.clone()),
-                    burn_rate: None,
-                    auth_source: source,
-                },
-                |mut c| {
-                    c.last_error = Some(e.clone());
-                    c
-                },
-            );
-            *state.cached_usage.write() = Some(placeholder.clone());
-            let _ = handle.emit("usage_updated", &placeholder);
+            emit_error_placeholder(handle, state, &account, source, &e);
             PollResult::Transient
         }
     }
+}
+
+/// Synthesize (or update) a `CachedUsage` carrying `last_error` so the popover
+/// can render its normal layout — em-dashes for missing numbers plus the stale
+/// banner — instead of hanging on the indefinite "Loading…" state when the
+/// very first poll fails (rate-limited or transient).
+fn emit_error_placeholder(
+    handle: &AppHandle,
+    state: &AppState,
+    account: &crate::auth::AccountInfo,
+    source: crate::auth::AuthSource,
+    error: &str,
+) {
+    let placeholder = state.cached_usage.read().clone().map_or_else(
+        || CachedUsage {
+            snapshot: UsageSnapshot {
+                five_hour: None,
+                seven_day: None,
+                seven_day_sonnet: None,
+                seven_day_opus: None,
+                extra_usage: None,
+                fetched_at: Utc::now(),
+                unknown: Default::default(),
+            },
+            account_id: account.id.0.clone(),
+            account_email: account.email.clone(),
+            last_error: Some(error.to_string()),
+            burn_rate: None,
+            auth_source: source,
+        },
+        |mut c| {
+            c.last_error = Some(error.to_string());
+            c
+        },
+    );
+    *state.cached_usage.write() = Some(placeholder.clone());
+    let _ = handle.emit("usage_updated", &placeholder);
 }
 
 /// Append the latest five_hour utilization to the rolling buffer, drop
