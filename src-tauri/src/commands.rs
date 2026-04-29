@@ -257,8 +257,8 @@ pub async fn has_claude_code_creds() -> Result<bool, String> {
 #[command]
 #[specta::specta]
 pub async fn update_settings(s: Settings, state: State<'_, Arc<AppState>>) -> Result<(), String> {
-    *state.settings.write() = s.clone();
     state.db.save_settings(&s).map_err(|e| e.to_string())?;
+    *state.settings.write() = s;
     Ok(())
 }
 

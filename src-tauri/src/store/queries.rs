@@ -349,8 +349,7 @@ mod tests {
 
     #[test]
     fn settings_roundtrip() {
-        let dir = tempdir().unwrap();
-        let db = Db::open(dir.path()).unwrap();
+        let (_dir, db) = fresh_db();
 
         // No row written yet — should return None.
         assert!(db.load_settings().unwrap().is_none());

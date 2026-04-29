@@ -11,6 +11,7 @@ use std::sync::Arc;
 use tokio::sync::Notify;
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(default)]
 pub struct Settings {
     pub polling_interval_secs: u64,
     pub thresholds: Vec<u8>,
