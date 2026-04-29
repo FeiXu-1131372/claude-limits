@@ -24,7 +24,9 @@ async fn successful_code_exchange() {
 }
 
 #[tokio::test]
-async fn exchange_error_body_surfaces() {
+async fn exchange_error_surfaces_status_not_body() {
+    // Body is redacted from the returned error (logged at debug level instead)
+    // to prevent token data from leaking into frontend-bound error strings.
     let mut server = Server::new_async().await;
     let _m = server
         .mock("POST", "/")
@@ -34,7 +36,9 @@ async fn exchange_error_body_surfaces() {
         .await;
     let ex = TokenExchange::with_endpoint(server.url());
     let err = ex.exchange_code("abc", "verif").await.unwrap_err();
-    assert!(err.to_string().contains("bad_code"));
+    let msg = err.to_string();
+    assert!(msg.contains("400"), "error should include HTTP status: {msg}");
+    assert!(!msg.contains("bad_code"), "error must not include response body: {msg}");
 }
 
 #[tokio::test]
