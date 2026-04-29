@@ -15,10 +15,9 @@
     "core:window:allow-hide",
     "opener:default",
     "autostart:default",
-    "dialog:default",
     "notification:default",
     "os:default",
-    "shell:default",
+    "shell:allow-open",
     "updater:default",
     "updater:allow-check",
     "updater:allow-download-and-install"
