@@ -54,7 +54,7 @@ impl AuthOrchestrator {
         let preferred = *self.preferred_source.lock().await;
 
         let token_oauth = token_store::load(&self.fallback_dir).map_err(AuthError::from)?;
-        let token_cli = claude_code_creds::load().map_err(AuthError::from)?;
+        let token_cli = claude_code_creds::load().await.map_err(AuthError::from)?;
 
         match (token_oauth, token_cli, preferred) {
             (Some(t), None, _) => {
@@ -130,7 +130,7 @@ impl AuthOrchestrator {
         }
         let refresh = tok.refresh_token.clone().ok_or(AuthError::NoRefreshToken)?;
         let new_tok = self.exchange.refresh(&refresh).await.map_err(AuthError::from)?;
-        token_store::save(&new_tok, &self.fallback_dir).map_err(AuthError::from)?;
+        token_store::save(&new_tok, &self.fallback_dir).await.map_err(AuthError::from)?;
         Ok(new_tok)
     }
 

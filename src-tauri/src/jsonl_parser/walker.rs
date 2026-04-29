@@ -1,7 +1,7 @@
 use super::record::parse_event_line;
 use super::pricing::PricingTable;
 use crate::store::{Db, StoredSessionEvent};
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use std::fs::{self, File};
 use std::io::{BufRead, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -51,7 +51,12 @@ pub fn discover_jsonl_files(root: &Path) -> Result<Vec<PathBuf>> {
     Ok(files)
 }
 
-pub fn ingest_file(db: &Db, pricing: &PricingTable, path: &Path) -> Result<usize> {
+pub fn ingest_file(
+    db: &Db,
+    pricing: &PricingTable,
+    path: &Path,
+    projects_root: &Path,
+) -> Result<usize> {
     let meta = fs::metadata(path)?;
     let file_len = meta.len() as i64;
     let mtime_ns = meta
@@ -61,7 +66,12 @@ pub fn ingest_file(db: &Db, pricing: &PricingTable, path: &Path) -> Result<usize
         .map(|d| d.as_nanos() as i64)
         .unwrap_or(0);
 
-    let key = path.display().to_string();
+    // P1-20: use to_str() so non-UTF-8 paths surface an error rather than
+    // producing a lossy key that silently never matches the cursor store.
+    let key = path
+        .to_str()
+        .ok_or_else(|| anyhow!("non-UTF-8 path: {:?}", path))?
+        .to_owned();
     let (prev_mtime, mut offset) = db.get_cursor(&key)?.unwrap_or((0, 0));
 
     if file_len < offset {
@@ -80,6 +90,14 @@ pub fn ingest_file(db: &Db, pricing: &PricingTable, path: &Path) -> Result<usize
         .and_then(|n| n.to_str())
         .unwrap_or("unknown")
         .to_string();
+
+    // P1-7: store relative path from the Claude projects root so that
+    // source_file values are not machine-specific absolute paths.
+    let source_file_path = path
+        .strip_prefix(projects_root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .into_owned();
 
     let mut reader = std::io::BufReader::new(f);
     let mut buf = Vec::new();
@@ -136,7 +154,7 @@ pub fn ingest_file(db: &Db, pricing: &PricingTable, path: &Path) -> Result<usize
                 cache_creation_5m_tokens: ev.cache_creation_5m_tokens,
                 cache_creation_1h_tokens: ev.cache_creation_1h_tokens,
                 cost_usd: cost,
-                source_file: key.clone(),
+                source_file: source_file_path.clone(),
                 source_line: line_start,
                 event_id,
             });
@@ -198,13 +216,18 @@ mod tests {
         let path = write_jsonl(&dir, &lines);
         let file_len = std::fs::metadata(&path).unwrap().len() as i64;
 
+        // The projects root is the temp dir itself (the JSONL lives in
+        // <dir>/my-project/session.jsonl, so dir.path() is the root).
+        let projects_root = dir.path().to_path_buf();
+
         // Spawn two threads; both race to ingest the same file.
         let handles: Vec<_> = (0..2)
             .map(|_| {
                 let db = Arc::clone(&db);
                 let pricing = Arc::clone(&pricing);
                 let path = path.clone();
-                std::thread::spawn(move || ingest_file(&db, &pricing, &path))
+                let root = projects_root.clone();
+                std::thread::spawn(move || ingest_file(&db, &pricing, &path, &root))
             })
             .collect();
 
@@ -218,8 +241,8 @@ mod tests {
         assert_eq!(total_inserted, 10, "expected exactly 10 unique events");
 
         // Cursor byte_offset must be at the file end (not regressed by the
-        // slower thread).
-        let key = path.display().to_string();
+        // slower thread). The cursor key is the absolute path string.
+        let key = path.to_str().expect("test path must be UTF-8").to_owned();
         let (_mtime, offset) = db.get_cursor(&key).unwrap().expect("cursor missing");
         assert_eq!(offset, file_len, "cursor must be at end-of-file");
     }

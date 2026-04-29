@@ -2,6 +2,7 @@ use super::super::StoredToken;
 use anyhow::{anyhow, Context, Result};
 use chrono::{TimeZone, Utc};
 use serde::Deserialize;
+use std::io;
 use std::process::Command;
 
 const SERVICE_PREFIX: &str = "Claude Code-credentials";
@@ -22,11 +23,11 @@ struct OauthBlock {
     expires_at_ms: i64,
 }
 
-pub fn load() -> Result<Option<StoredToken>> {
-    let services = discover_services()?;
+pub async fn load() -> Result<Option<StoredToken>> {
+    let services = discover_services().await?;
     let mut candidates = Vec::new();
     for svc in services {
-        if let Ok(Some(tok)) = read_one(&svc) {
+        if let Ok(Some(tok)) = read_one(svc).await {
             candidates.push(tok);
         }
     }
@@ -34,8 +35,13 @@ pub fn load() -> Result<Option<StoredToken>> {
     Ok(candidates.pop())
 }
 
-fn discover_services() -> Result<Vec<String>> {
-    let output = Command::new("security").arg("dump-keychain").output();
+async fn discover_services() -> Result<Vec<String>> {
+    let output = tokio::task::spawn_blocking(|| {
+        Command::new("security").arg("dump-keychain").output()
+    })
+    .await
+    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
     let stdout = match output {
         Ok(o) => String::from_utf8_lossy(&o.stdout).to_string(),
         Err(_) => return Ok(vec![SERVICE_PREFIX.to_string()]),
@@ -58,11 +64,16 @@ fn discover_services() -> Result<Vec<String>> {
     Ok(services)
 }
 
-fn read_one(service: &str) -> Result<Option<StoredToken>> {
-    let out = Command::new("security")
-        .args(["find-generic-password", "-s", service, "-w"])
-        .output()
-        .context("spawn security find-generic-password")?;
+async fn read_one(service: String) -> Result<Option<StoredToken>> {
+    let out = tokio::task::spawn_blocking(move || {
+        Command::new("security")
+            .args(["find-generic-password", "-s", &service, "-w"])
+            .output()
+    })
+    .await
+    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
+    .context("spawn security find-generic-password")?;
+
     if !out.status.success() {
         return Ok(None);
     }
@@ -94,12 +105,16 @@ fn read_one(service: &str) -> Result<Option<StoredToken>> {
     }))
 }
 
-pub fn has_creds() -> bool {
-    Command::new("security")
-        .args(["find-generic-password", "-s", SERVICE_PREFIX])
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+pub async fn has_creds() -> bool {
+    tokio::task::spawn_blocking(|| {
+        Command::new("security")
+            .args(["find-generic-password", "-s", SERVICE_PREFIX])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    })
+    .await
+    .unwrap_or(false)
 }
 
 #[cfg(test)]

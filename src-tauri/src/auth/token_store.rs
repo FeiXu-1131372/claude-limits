@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 const KEYRING_SERVICE: &str = "claude-limits";
 const KEYRING_USER: &str = "oauth_refresh";
 
-pub fn save(token: &StoredToken, fallback_dir: &Path) -> Result<()> {
+pub async fn save(token: &StoredToken, fallback_dir: &Path) -> Result<()> {
     let payload = serde_json::to_string(token)?;
     match keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER) {
         Ok(entry) => match entry.set_password(&payload) {
@@ -16,12 +16,12 @@ pub fn save(token: &StoredToken, fallback_dir: &Path) -> Result<()> {
             }
             Err(e) => {
                 tracing::warn!("keyring save failed ({e}); falling back to restricted file");
-                save_fallback(token, fallback_dir)
+                save_fallback(token, fallback_dir).await
             }
         },
         Err(e) => {
             tracing::warn!("keyring unavailable ({e}); using restricted file");
-            save_fallback(token, fallback_dir)
+            save_fallback(token, fallback_dir).await
         }
     }
 }
@@ -50,12 +50,12 @@ fn fallback_path(dir: &Path) -> PathBuf {
     dir.join("credentials.json")
 }
 
-fn save_fallback(token: &StoredToken, dir: &Path) -> Result<()> {
+async fn save_fallback(token: &StoredToken, dir: &Path) -> Result<()> {
     fs::create_dir_all(dir)?;
     let p = fallback_path(dir);
     let payload = serde_json::to_string_pretty(token)?;
     fs::write(&p, payload).context("write fallback credential file")?;
-    restrict_permissions(&p)?;
+    restrict_permissions(p).await?;
     Ok(())
 }
 
@@ -69,26 +69,32 @@ fn load_fallback(dir: &Path) -> Result<Option<StoredToken>> {
 }
 
 #[cfg(unix)]
-fn restrict_permissions(p: &Path) -> Result<()> {
+async fn restrict_permissions(p: PathBuf) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
-    let mut perms = fs::metadata(p)?.permissions();
+    let mut perms = fs::metadata(&p)?.permissions();
     perms.set_mode(0o600);
-    fs::set_permissions(p, perms)?;
+    fs::set_permissions(&p, perms)?;
     Ok(())
 }
 
 #[cfg(windows)]
-fn restrict_permissions(p: &Path) -> Result<()> {
+async fn restrict_permissions(p: PathBuf) -> Result<()> {
+    use std::io;
     use std::process::Command;
-    let status = Command::new("icacls")
-        .arg(p)
-        .args([
-            "/inheritance:r",
-            "/grant:r",
-            &format!("{}:F", whoami::username()),
-        ])
-        .status()
-        .context("icacls failed to run")?;
+    let username = whoami::username();
+    let status = tokio::task::spawn_blocking(move || {
+        Command::new("icacls")
+            .arg(&p)
+            .args([
+                "/inheritance:r",
+                "/grant:r",
+                &format!("{}:F", username),
+            ])
+            .status()
+            .context("icacls failed to run")
+    })
+    .await
+    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))??;
     if !status.success() {
         anyhow::bail!("icacls returned non-zero");
     }
@@ -96,6 +102,6 @@ fn restrict_permissions(p: &Path) -> Result<()> {
 }
 
 #[cfg(not(any(unix, windows)))]
-fn restrict_permissions(_: &Path) -> Result<()> {
+async fn restrict_permissions(_: PathBuf) -> Result<()> {
     Ok(())
 }

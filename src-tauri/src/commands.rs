@@ -213,7 +213,7 @@ pub async fn submit_oauth_code(
         .exchange_code(&code, &pkce.verifier)
         .await
         .map_err(err_to_string)?;
-    token_store::save(&token, &state.fallback_dir).map_err(err_to_string)?;
+    token_store::save(&token, &state.fallback_dir).await.map_err(err_to_string)?;
 
     *state.pending_oauth.write() = None;
     state.auth.set_preferred_source(AuthSource::OAuth).await;
@@ -262,7 +262,7 @@ pub async fn force_refresh(state: State<'_, Arc<AppState>>) -> Result<(), String
 #[command]
 #[specta::specta]
 pub async fn has_claude_code_creds() -> Result<bool, String> {
-    Ok(crate::auth::claude_code_creds::has_creds())
+    Ok(crate::auth::claude_code_creds::has_creds().await)
 }
 
 #[command]

@@ -6,18 +6,18 @@ pub mod macos;
 #[cfg(target_os = "windows")]
 pub mod windows;
 
-pub fn load() -> Result<Option<StoredToken>> {
+pub async fn load() -> Result<Option<StoredToken>> {
     #[cfg(target_os = "macos")]
-    return macos::load();
+    return macos::load().await;
     #[cfg(target_os = "windows")]
     return windows::load();
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     return Ok(None);
 }
 
-pub fn has_creds() -> bool {
+pub async fn has_creds() -> bool {
     #[cfg(target_os = "macos")]
-    return macos::has_creds();
+    return macos::has_creds().await;
     #[cfg(target_os = "windows")]
     return windows::has_creds();
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]

@@ -296,6 +296,7 @@ pub fn run() {
                                 &bf_state.db,
                                 &bf_state.pricing,
                                 &f,
+                                &bf_root,
                             );
                         }
                     }

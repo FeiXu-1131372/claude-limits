@@ -30,6 +30,7 @@ pub fn start(
 
     let db_clone = db.clone();
     let pricing_clone = pricing.clone();
+    let root_clone = root.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(events) = notify_rx.recv().await {
             let mut touched = std::collections::HashSet::<PathBuf>::new();
@@ -41,7 +42,7 @@ pub fn start(
                 }
             }
             for p in touched {
-                match walker::ingest_file(&db_clone, &pricing_clone, &p) {
+                match walker::ingest_file(&db_clone, &pricing_clone, &p, &root_clone) {
                     Ok(n) if n > 0 => {
                         let _ = tx.send(n);
                     }
