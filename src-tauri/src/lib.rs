@@ -20,24 +20,52 @@ pub fn run() {
     let _log_guard = logging::init(log_dir.clone());
 
     let data_dir = store::default_dir();
-    let db = Arc::new(store::Db::open(&data_dir).expect("open db"));
+    let db_result = store::Db::open(&data_dir).unwrap_or_else(|e| {
+        tracing::error!("fatal: cannot open or recover the database: {e}");
+        std::process::exit(1);
+    });
+    let db_recovered = db_result.recovered;
+    let db = Arc::new(db_result);
     let pricing = Arc::new(jsonl_parser::PricingTable::bundled().expect("pricing"));
-    let auth = Arc::new(auth::AuthOrchestrator::new(data_dir.clone()));
-    let usage_client = Arc::new(
-        usage_api::UsageClient::new(env!("CARGO_PKG_VERSION").to_string()).expect("client"),
+
+    // One shared HTTP client for all outbound requests (usage API, token
+    // exchange, and identity fetcher).  Built once with the canonical timeout
+    // configuration so every caller benefits from connection-pool reuse.
+    let http_client = Arc::new(
+        reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .build()
+            .expect("http client"),
     );
+
+    let usage_client = Arc::new(
+        usage_api::UsageClient::new(http_client.clone(), env!("CARGO_PKG_VERSION").to_string()),
+    );
+
+    let persisted_settings = db
+        .load_settings()
+        .unwrap_or_else(|e| {
+            tracing::warn!("failed to load persisted settings, using defaults: {e}");
+            None
+        })
+        .unwrap_or_default();
+
+    let auth = Arc::new(auth::AuthOrchestrator::new(
+        data_dir.clone(),
+        persisted_settings.preferred_auth_source,
+        http_client,
+    ));
 
     let app_state = Arc::new(AppState {
         db: db.clone(),
         auth,
         usage: usage_client,
         pricing: pricing.clone(),
-        settings: parking_lot::RwLock::new(app_state::Settings::default()),
+        settings: parking_lot::RwLock::new(persisted_settings),
         cached_usage: parking_lot::RwLock::new(None),
-        pending_oauth: parking_lot::RwLock::new(None),
         fallback_dir: data_dir.clone(),
         force_refresh: tokio::sync::Notify::new(),
-        recent_five_hour: parking_lot::RwLock::new(std::collections::VecDeque::new()),
     });
 
     // tauri-specta's Builder::commands replaces previously registered commands rather
@@ -46,6 +74,7 @@ pub fn run() {
     let specta_builder = tauri_specta::Builder::<tauri::Wry>::new()
         .commands(tauri_specta::collect_commands![
             commands::get_current_usage,
+            commands::get_pricing,
             commands::get_session_history,
             commands::get_daily_trends,
             commands::get_model_breakdown,
@@ -69,6 +98,7 @@ pub fn run() {
     let specta_builder = tauri_specta::Builder::<tauri::Wry>::new()
         .commands(tauri_specta::collect_commands![
             commands::get_current_usage,
+            commands::get_pricing,
             commands::get_session_history,
             commands::get_daily_trends,
             commands::get_model_breakdown,
@@ -93,7 +123,8 @@ pub fn run() {
     specta_builder
         .export(
             specta_typescript::Typescript::default()
-                .bigint(specta_typescript::BigIntExportBehavior::Number),
+                .bigint(specta_typescript::BigIntExportBehavior::Number)
+                .header("// @ts-nocheck"),
             "../src/lib/generated/bindings.ts",
         )
         .expect("failed to export specta bindings");
@@ -102,12 +133,13 @@ pub fn run() {
         .manage(app_state)
         .manage(std::sync::Arc::new(crate::updater::UpdaterGuard::default()))
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            use tauri::Manager;
+            use tauri::{Emitter, Manager};
             if let Some(w) = app.get_webview_window("popover") {
                 use tauri_plugin_positioner::{WindowExt, Position};
                 let _ = w.move_window(Position::TrayCenter);
                 let _ = w.show();
                 let _ = w.set_focus();
+                let _ = w.app_handle().emit("popover_shown", ());
             }
         }))
         .plugin(tauri_plugin_shell::init())
@@ -122,7 +154,7 @@ pub fn run() {
         ))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(specta_builder.invoke_handler())
-        .setup(|app| {
+        .setup(move |app| {
             use tauri::Manager;
             let handle = app.handle().clone();
             let state: Arc<AppState> = app.state::<Arc<AppState>>().inner().clone();
@@ -212,10 +244,12 @@ pub fn run() {
                 tray.on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(w) = app.get_webview_window("popover") {
+                            use tauri::Emitter;
                             use tauri_plugin_positioner::{WindowExt, Position};
                             let _ = w.move_window(Position::TrayCenter);
                             let _ = w.show();
                             let _ = w.set_focus();
+                            let _ = app.emit("popover_shown", ());
                         }
                     }
                     "check_updates" => {
@@ -242,10 +276,12 @@ pub fn run() {
                                 use tauri::Emitter;
                                 let _ = w.app_handle().emit("popover_hidden", ());
                             } else {
+                                use tauri::Emitter;
                                 use tauri_plugin_positioner::{WindowExt, Position};
                                 let _ = w.move_window(Position::TrayCenter);
                                 let _ = w.show();
                                 let _ = w.set_focus();
+                                let _ = w.app_handle().emit("popover_shown", ());
                             }
                         }
                     }
@@ -254,6 +290,20 @@ pub fn run() {
                 tracing::error!(
                     "tray_by_id('main') returned None — tauri.conf.json `trayIcon` block missing?"
                 );
+            }
+
+            // Emit db_reset if the DB was corrupt and had to be recreated.
+            // We do this here (inside `setup`) so the app handle is available.
+            // The event is fired from a short-lived task to avoid blocking the
+            // setup hook; the frontend subscribes before the first render, so
+            // the slight async delay is harmless.
+            if db_recovered {
+                let h = handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    use tauri::Emitter;
+                    let _ = h.emit("db_reset", ());
+                    tracing::warn!("emitted db_reset event — DB was corrupt and has been recreated");
+                });
             }
 
             poll_loop::spawn(handle.clone(), state.clone());
@@ -269,6 +319,7 @@ pub fn run() {
                                 &bf_state.db,
                                 &bf_state.pricing,
                                 &f,
+                                &bf_root,
                             );
                         }
                     }
@@ -298,7 +349,11 @@ pub fn run() {
                     Ok(handle) => {
                         Box::leak(Box::new(handle));
                     }
-                    Err(e) => tracing::error!("jsonl watcher failed to start: {e}"),
+                    Err(e) => {
+                        tracing::error!("jsonl watcher failed to start: {e}");
+                        use tauri::Emitter;
+                        let _ = handle.emit("watcher_error", e.to_string());
+                    }
                 }
             }
 

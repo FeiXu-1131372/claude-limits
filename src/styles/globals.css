@@ -35,16 +35,25 @@ body {
   line-height: var(--leading-body);
 }
 
-/* The compact popover is a transparent, vibrancy-backed Tauri window. Letting
- * the body paint a solid color would cover the native blur, so we explicitly
- * opt that mode out. The expanded view keeps the opaque base. */
+/* Both windows are decorations:false + transparent:true at the Tauri level —
+ * the OS draws no chrome and no rounded corners for us. The body would
+ * otherwise fill the window edge-to-edge with a sharp-cornered solid color,
+ * so we make it transparent in both modes and let #root carry the rounded
+ * background. */
 body[data-view-mode="compact"],
-html:has(body[data-view-mode="compact"]) {
+body[data-view-mode="expanded"],
+html:has(body[data-view-mode="compact"]),
+html:has(body[data-view-mode="expanded"]) {
   background: transparent;
 }
 
 #root {
   height: 100vh;
+  /* Default rounding so a webview that mounts before data-view-mode is set
+   * (race during init) still shows rounded corners rather than flashing a
+   * sharp rectangle. */
+  border-radius: var(--window-radius, var(--radius-lg));
+  overflow: hidden;
 }
 
 body[data-view-mode="compact"] #root {
@@ -57,12 +66,18 @@ body[data-view-mode="compact"] #root {
    * The 0.86 alpha keeps a subtle hint of native blur showing through (so the
    * widget still reads as glass) while giving text a stable dark canvas to
    * sit on. The two warm radial washes add a light-source feel on top. */
-  border-radius: var(--window-radius, var(--radius-lg));
-  overflow: hidden;
   background:
     radial-gradient(120% 80% at 0% 0%, oklch(72% 0.10 55 / 0.08), transparent 55%),
     radial-gradient(120% 80% at 100% 100%, oklch(67% 0.135 38 / 0.05), transparent 55%),
     oklch(20% 0.012 65 / 0.86);
+}
+
+body[data-view-mode="expanded"] #root {
+  /* The expanded report is a regular opaque dark window — no vibrancy — but
+   * it still needs the same rounded shell as the popover so the corners
+   * match other macOS windows (Control Center, Mail, Finder all clip to
+   * ~10–14px). */
+  background: var(--color-bg-base);
 }
 
 /* The drag-region elements get the system "default" cursor so they don't show
@@ -75,6 +90,20 @@ body[data-view-mode="compact"] #root {
 @keyframes pulse-dot {
   0%, 100% { transform: scale(1); opacity: 0.55; }
   50%      { transform: scale(2.4); opacity: 0; }
+}
+
+/* One-shot appear animation triggered when the popover/window becomes
+ * visible from the tray. Driven by body[data-appearing="true"] which
+ * the store sets for ~240ms after a popover_shown event. Subtle scale
+ * + fade matches Control Center / Raycast emergence. */
+@keyframes window-appear {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+body[data-appearing="true"] #root {
+  animation: window-appear 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: 50% 0%;
 }
 
 /* ─── Glass mixin (applied to translucent surfaces) ─── */
@@ -137,8 +166,8 @@ body[data-view-mode="compact"] #root {
   *,
   *::before,
   *::after {
-    animation-duration: var(--duration-instant) !important;
-    transition-duration: var(--duration-instant) !important;
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
   }
 }
 

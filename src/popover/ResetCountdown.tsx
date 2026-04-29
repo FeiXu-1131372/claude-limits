@@ -16,11 +16,13 @@ function humanize(ms: number): string {
  */
 export function ResetCountdown({ resetsAt }: { resetsAt: string }) {
   const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const i = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(i);
-  }, []);
   const target = new Date(resetsAt).getTime();
+  useEffect(() => {
+    const remaining = target - now;
+    const interval = remaining > 0 && remaining < 5 * 60 * 1000 ? 10_000 : 30_000;
+    const i = setInterval(() => setNow(Date.now()), interval);
+    return () => clearInterval(i);
+  }, [now, target]);
   return (
     <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)] whitespace-nowrap">
       in{' '}

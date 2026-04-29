@@ -36,12 +36,19 @@ export function ExpandedReport() {
   const [activeTab, setActiveTab] = useState<string>('sessions');
   const [refreshing, setRefreshing] = useState(false);
   const [tabKey, setTabKey] = useState(0);
+  const prevTabRef = useRef<string>('sessions');
   const stale = useAppStore((s) => s.stale);
   const usage = useAppStore((s) => s.usage);
   const thresholds = useAppStore((s) => s.settings?.thresholds ?? [75, 90]);
   const toggleViewMode = useAppStore((s) => s.toggleViewMode);
 
   const TabComponent = TAB_COMPONENTS[activeTab] ?? SessionsTab;
+
+  const tabIds = TAB_CONFIG.map((t) => t.id) as string[];
+  const prevIdx = tabIds.indexOf(prevTabRef.current);
+  const currIdx = tabIds.indexOf(activeTab);
+  const slideDir = currIdx >= prevIdx ? 1 : -1;
+  prevTabRef.current = activeTab;
 
   const warn = thresholds[0] ?? 75;
   const danger = thresholds[1] ?? 90;
@@ -129,7 +136,7 @@ export function ExpandedReport() {
           initial="enter"
           animate="center"
           exit="exit"
-          custom={1}
+          custom={slideDir}
         >
           <TabComponent />
         </motion.div>

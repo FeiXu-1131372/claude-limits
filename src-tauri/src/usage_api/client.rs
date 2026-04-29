@@ -2,6 +2,7 @@ use super::types::UsageSnapshot;
 use anyhow::Result;
 use chrono::Utc;
 use reqwest::{Client, StatusCode};
+use std::sync::Arc;
 use std::time::Duration;
 
 pub const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
@@ -11,27 +12,24 @@ pub const ANTHROPIC_BETA: &str = "oauth-2025-04-20";
 pub enum FetchOutcome {
     Ok(UsageSnapshot),
     Unauthorized,
-    RateLimited,
+    /// Server returned 429. Carries the `Retry-After` delay when the header is present.
+    RateLimited(Option<Duration>),
     Transient(String),
 }
 
 pub struct UsageClient {
     base_url: String,
-    inner: Client,
+    inner: Arc<Client>,
     app_version: String,
 }
 
 impl UsageClient {
-    pub fn new(app_version: String) -> Result<Self> {
-        let inner = Client::builder()
-            .timeout(Duration::from_secs(30))
-            .connect_timeout(Duration::from_secs(10))
-            .build()?;
-        Ok(Self {
+    pub fn new(client: Arc<Client>, app_version: String) -> Self {
+        Self {
             base_url: USAGE_URL.to_string(),
-            inner,
+            inner: client,
             app_version,
-        })
+        }
     }
 
     pub fn with_base_url(base_url: String, app_version: String) -> Result<Self> {
@@ -40,7 +38,7 @@ impl UsageClient {
             .build()?;
         Ok(Self {
             base_url,
-            inner,
+            inner: Arc::new(inner),
             app_version,
         })
     }
@@ -84,8 +82,17 @@ impl UsageClient {
                 FetchOutcome::Unauthorized
             }
             StatusCode::TOO_MANY_REQUESTS => {
-                tracing::warn!("usage fetch returned 429 rate-limited");
-                FetchOutcome::RateLimited
+                let retry_after = resp
+                    .headers()
+                    .get("retry-after")
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .map(Duration::from_secs);
+                tracing::warn!(
+                    "usage fetch returned 429 rate-limited; retry-after={:?}",
+                    retry_after
+                );
+                FetchOutcome::RateLimited(retry_after)
             }
             s if s.is_server_error() => {
                 tracing::warn!("usage fetch server error: {s}");

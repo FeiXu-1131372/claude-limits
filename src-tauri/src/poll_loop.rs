@@ -13,9 +13,14 @@ use tauri::{AppHandle, Emitter};
 
 static STALE_EMITTED: AtomicBool = AtomicBool::new(false);
 
+pub fn reset_stale_flag() {
+    STALE_EMITTED.store(false, Ordering::SeqCst);
+}
+
 pub fn spawn(handle: AppHandle, state: Arc<AppState>) {
     tauri::async_runtime::spawn(async move {
-        let _ = poll_once(&handle, &state).await;
+        let mut recent_five_hour: VecDeque<(DateTime<Utc>, f64)> = VecDeque::new();
+        let _ = poll_once(&handle, &state, &mut recent_five_hour).await;
         let mut backoff = Duration::from_secs(60);
         loop {
             let interval = {
@@ -37,13 +42,14 @@ pub fn spawn(handle: AppHandle, state: Arc<AppState>) {
                 }
             }
 
-            match poll_once(&handle, &state).await {
+            match poll_once(&handle, &state, &mut recent_five_hour).await {
                 PollResult::Ok => {
                     STALE_EMITTED.store(false, Ordering::Relaxed);
                     backoff = Duration::from_secs(60);
                 }
-                PollResult::Backoff => {
-                    tokio::time::sleep(backoff).await;
+                PollResult::Backoff(retry_after) => {
+                    let wait = retry_after.unwrap_or(backoff);
+                    tokio::time::sleep(wait).await;
                     backoff = next_backoff(backoff);
                 }
                 PollResult::Transient => {}
@@ -54,12 +60,17 @@ pub fn spawn(handle: AppHandle, state: Arc<AppState>) {
 
 enum PollResult {
     Ok,
-    Backoff,
+    /// Server asked us to back off. Carries the `Retry-After` hint when present.
+    Backoff(Option<Duration>),
     Transient,
 }
 
-async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
-    let (token, _source, account) = match state.auth.get_access_token().await {
+async fn poll_once(
+    handle: &AppHandle,
+    state: &AppState,
+    recent_five_hour: &mut VecDeque<(DateTime<Utc>, f64)>,
+) -> PollResult {
+    let (token, source, account) = match state.auth.get_access_token().await {
         Ok(t) => t,
         Err(AuthError::NoSource) => {
             tray::set_level(handle, None, None, None, None, true);
@@ -98,7 +109,7 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
             // projection. Resets between windows are handled by trimming
             // entries that fall outside [resets_at - 5h, resets_at].
             let burn_rate = update_history_and_compute_burn_rate(
-                state,
+                recent_five_hour,
                 &snapshot,
                 Utc::now(),
             );
@@ -109,6 +120,7 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
                 account_email: account.email.clone(),
                 last_error: None,
                 burn_rate,
+                auth_source: source,
             };
             *state.cached_usage.write() = Some(cached.clone());
             let _ = handle.emit("usage_updated", &cached);
@@ -150,59 +162,67 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
             let _ = handle.emit("auth_required", ());
             PollResult::Transient
         }
-        FetchOutcome::RateLimited => {
+        FetchOutcome::RateLimited(retry_after) => {
             tracing::warn!("usage api rate-limited; backing off");
-            PollResult::Backoff
+            emit_error_placeholder(handle, state, &account, source, "rate-limited (429)");
+            PollResult::Backoff(retry_after)
         }
         FetchOutcome::Transient(e) => {
             tracing::warn!("usage api transient error: {e}");
-            // On the very first poll, cached_usage is None and the previous
-            // implementation dropped the error here — leaving the popover in
-            // an indefinite "Loading…" state with nothing in logs and no
-            // event to the frontend. Synthesize an empty placeholder so the
-            // popover can render its normal layout (em-dashes for missing
-            // numbers) plus the stale banner driven by last_error.
-            let placeholder = state.cached_usage.read().clone().map_or_else(
-                || CachedUsage {
-                    snapshot: UsageSnapshot {
-                        five_hour: None,
-                        seven_day: None,
-                        seven_day_sonnet: None,
-                        seven_day_opus: None,
-                        extra_usage: None,
-                        fetched_at: Utc::now(),
-                        unknown: Default::default(),
-                    },
-                    account_id: account.id.0.clone(),
-                    account_email: account.email.clone(),
-                    last_error: Some(e.clone()),
-                    burn_rate: None,
-                },
-                |mut c| {
-                    c.last_error = Some(e.clone());
-                    c
-                },
-            );
-            *state.cached_usage.write() = Some(placeholder.clone());
-            let _ = handle.emit("usage_updated", &placeholder);
+            emit_error_placeholder(handle, state, &account, source, &e);
             PollResult::Transient
         }
     }
+}
+
+/// Synthesize (or update) a `CachedUsage` carrying `last_error` so the popover
+/// can render its normal layout — em-dashes for missing numbers plus the stale
+/// banner — instead of hanging on the indefinite "Loading…" state when the
+/// very first poll fails (rate-limited or transient).
+fn emit_error_placeholder(
+    handle: &AppHandle,
+    state: &AppState,
+    account: &crate::auth::AccountInfo,
+    source: crate::auth::AuthSource,
+    error: &str,
+) {
+    let placeholder = state.cached_usage.read().clone().map_or_else(
+        || CachedUsage {
+            snapshot: UsageSnapshot {
+                five_hour: None,
+                seven_day: None,
+                seven_day_sonnet: None,
+                seven_day_opus: None,
+                extra_usage: None,
+                fetched_at: Utc::now(),
+                unknown: Default::default(),
+            },
+            account_id: account.id.0.clone(),
+            account_email: account.email.clone(),
+            last_error: Some(error.to_string()),
+            burn_rate: None,
+            auth_source: source,
+        },
+        |mut c| {
+            c.last_error = Some(error.to_string());
+            c
+        },
+    );
+    *state.cached_usage.write() = Some(placeholder.clone());
+    let _ = handle.emit("usage_updated", &placeholder);
 }
 
 /// Append the latest five_hour utilization to the rolling buffer, drop
 /// entries that fall outside the live window, and return a projection if
 /// we have enough samples (≥2 points spanning ≥2 minutes).
 fn update_history_and_compute_burn_rate(
-    state: &AppState,
+    buf: &mut VecDeque<(DateTime<Utc>, f64)>,
     snapshot: &UsageSnapshot,
     now: DateTime<Utc>,
 ) -> Option<BurnRateProjection> {
     let five_hour = snapshot.five_hour.as_ref()?;
     let resets_at = five_hour.resets_at;
     let window_start = resets_at - ChronoDuration::hours(5);
-
-    let mut buf = state.recent_five_hour.write();
 
     // Drop samples from previous windows. Keeps memory bounded and avoids
     // basing slope on a stale window's values when a reset has happened.
@@ -215,7 +235,7 @@ fn update_history_and_compute_burn_rate(
     }
     buf.push_back((now, five_hour.utilization));
 
-    project_burn_rate(&buf, resets_at, now)
+    project_burn_rate(buf, resets_at, now)
 }
 
 /// Pure function — no AppState, no I/O — so it can be tested directly.

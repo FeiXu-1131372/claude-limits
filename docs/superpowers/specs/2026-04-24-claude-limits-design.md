@@ -86,7 +86,7 @@ A cross-platform (macOS + Windows) menu-bar utility that monitors a Claude subsc
 | Database | **SQLite via `rusqlite`** | Local-only, zero external deps. |
 | HTTP client | **`reqwest`** (Rust) | 429/timeout ergonomics, proven in ai-token-monitor. |
 | File watcher | **`notify` crate** | Cross-platform, proven. |
-| App credential storage | **`keyring` crate** (primary) + restricted-ACL file (fallback) | Keychain on macOS, Credential Manager on Windows. Fallback file: 0o600 on macOS/Unix; on Windows, the file is ACL-restricted to the current user (DACL via `SetNamedSecurityInfoW` / `icacls /inheritance:r /grant:r "%USERNAME%:F"`) since NTFS doesn't honor POSIX mode bits. |
+| App credential storage | **Restricted-ACL file** at `<config>/credentials.json` | 0o600 on macOS/Unix; on Windows, the file is ACL-restricted to the current user (`icacls /inheritance:r /grant:r "%USERNAME%:F"`) since NTFS doesn't honor POSIX mode bits. The OS keychain (Keychain Access on macOS, Credential Manager on Windows, Secret Service on Linux) is **deliberately not used** — see §2.5.1 for rationale. |
 | Build / packaging | **Tauri CLI 2** | Produces `.dmg` on macOS hosts and `.exe` + `.msi` on Windows hosts. **CI matrix required** — Tauri v2 does NOT cross-compile macOS from non-macOS hosts (requires Apple tooling). |
 
 ### OAuth configuration (concrete values)
@@ -128,7 +128,7 @@ Tray icon + popover window (transparent, vibrancy/Mica-enabled per §2.5), secon
 | Popover backdrop | NSVisualEffectView vibrancy (system materials) | Mica | Translucent solid fallback (no blur) | `tauri-plugin-window-vibrancy`; Win10 uses CSS tinted fill |
 | Tray icon | Template image (auto-tints for menu-bar) + color overlay badge when >75% | Full-color ICO, color-coded directly | Same as Win11 | Badges drawn at runtime; template path used for base icon on macOS |
 | Auto-launch at login | `tauri-plugin-autostart` → SMAppService (may prompt re-approval for unsigned apps after Gatekeeper revalidation) | `tauri-plugin-autostart` → `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` | Same as Win11 | Known limit: SMAppService may silently fail on non-notarized apps; fall back to `LaunchAgents` plist if available |
-| App's own credential storage | Keychain via `keyring` crate | Credential Manager via `keyring` crate | Same as Win11 | Fallback file at `<config>/credentials.json`: 0o600 on macOS; DACL-restricted to current user on Windows (`SetNamedSecurityInfoW` or `icacls /inheritance:r /grant:r` equivalent) |
+| App's own credential storage | File at `<config>/credentials.json`, mode 0o600 | File at `<config>\credentials.json`, owner-only ACL (`icacls /inheritance:r /grant:r "%USERNAME%:F"`) | Same as Win11 | Same path on every platform; OS keychain not used (see §2.5.1) |
 | Reading Claude Code credentials | Keychain: enumerate `Claude Code-credentials*` service names via `security dump-keychain`; trim occasional leading non-ASCII byte before JSON parse | File: `%USERPROFILE%\.claude\.credentials.json` (plaintext JSON) | Same as Win11 | WSL Claude Code: v1 non-goal — `wsl.exe -d <distro> -- cat ~/.claude/.credentials.json` is documented as v2 feature |
 | Notifications | `tauri-plugin-notification` (User Notifications framework) | `tauri-plugin-notification` (Toast XML) | Same | Requires first-launch permission prompt on macOS |
 | Deep-link | **Not used** (paste-back flow avoids this entirely) | — | — | — |
@@ -136,6 +136,20 @@ Tray icon + popover window (transparent, vibrancy/Mica-enabled per §2.5), secon
 | Single-instance guard | `tauri-plugin-single-instance` + SQLite file lock | Same | Same | Second launch raises existing popover |
 
 **Soft guarantees documented in UI:** Win10 users see a footer in Settings → About: "Backdrop effects limited on Windows 10 — consider upgrading for full visual fidelity." No hidden degradation.
+
+### 2.5.1 Why the OS keychain is deliberately not used
+
+The original spec called for the `keyring` crate (Keychain Access on macOS, Credential Manager on Windows, Secret Service on Linux) as the primary store with a file fallback. This was reverted on 2026-04-29 after observing the real UX on unsigned open-source distribution. The rationale, in case future contributors are tempted to "fix" the file-only approach by re-adding the keychain:
+
+1. **The macOS prompt is indistinguishable from malware.** Keychain ACLs are bound to the calling binary's code signature. An unsigned (or ad-hoc-signed) open-source app gets a different signature on each `cargo build` and on each user's downloaded binary, so the "Always Allow" the OS records never applies on the next run. The user sees `"claude-limits wants to use your confidential information stored in 'claude-limits' in your keychain. To allow this, enter the 'login' keychain password."` — exactly what credential-stealing malware shows. The correct user response is "Deny," which kills adoption.
+
+2. **The threat model is already covered.** FileVault (default on every macOS install since Big Sur, 2020) encrypts the home directory at rest. POSIX `0600` (and the equivalent Windows owner-only ACL) prevents other local users from reading the file. Root reads either store regardless. For an attacker without root and without a logged-in session, both stores are equally inaccessible.
+
+3. **The secret has small blast radius.** We store exactly one OAuth refresh token, voidable at any time by signing out. There's no PII, no payment info, no API key with broad access. The marginal security win of hardware-backed encryption isn't worth the user-trust hit on first launch.
+
+4. **Code that doesn't run can't break.** The keyring path carried two latent bugs in practice: (a) refreshed CLI tokens being saved into the OAuth slot, and (b) per-rebuild prompts in dev. A single well-understood persistence path (file + restrictive perms) eliminates both classes.
+
+**When this should be revisited:** if the app starts handling broader-scope secrets (e.g., long-lived API keys, payment credentials, anything bigger than "current session refresh token"), revisit. The keychain becomes worth the UX cost when the secret's blast radius exceeds the cost of a one-time prompt-rejection. Until then, the file is correct.
 
 ---
 
@@ -152,7 +166,7 @@ src-tauri/src/
 │   ├── claude_code_creds.rs         # Dispatcher
 │   ├── claude_code_creds_macos.rs   # Keychain discovery + stray-byte trim
 │   ├── claude_code_creds_windows.rs # Plaintext file read from %USERPROFILE%\.claude\.credentials.json
-│   ├── token_store.rs               # keyring crate + 0o600 file fallback; docs encryption-at-rest
+│   ├── token_store.rs               # 0o600 / owner-ACL file at <config>/credentials.json (no OS keychain — see §2.5.1)
 │   └── account_identity.rs          # /api/oauth/userinfo fetch for conflict resolution
 ├── usage_api/
 │   ├── mod.rs                       # pub async fn fetch_usage(token) -> UsageSnapshot
@@ -357,7 +371,7 @@ User launches app
   5. User copies it, pastes into AuthPanel, clicks Continue
   6. Frontend calls submit_oauth_code(pasted)
   7. Backend parses "code#state", verifies state matches, exchanges code at token_endpoint
-  8. Refresh token → keyring (file fallback on failure); access token → memory; AccountId resolved via /api/oauth/userinfo
+  8. Refresh token → restricted-ACL file at `<config>/credentials.json`; access token → memory; AccountId resolved via /api/oauth/userinfo
   9. First fetch_usage() kicks off → popover transitions to normal view
 
   (Local creds path)
@@ -531,9 +545,8 @@ The `< resets_at` check auto-clears state on each reset, so next day's crossing 
 | Token exchange HTTP 4xx | AuthPanel shows exact status + message; logs to `~/.claude-monitor/logs/`. |
 | Refresh token revoked / expired | `fetch_usage` returns 401 → auth module clears stored token → emits `auth_required`. Popover banner: "Sign in to continue monitoring." No polling until user reauths. |
 | Claude Code creds present initially, then gone (`claude login` expired/logged out) | Banner: "Claude Code credentials no longer available — sign in with Claude instead." |
-| Keychain/Credential Manager access denied by user | Fall back to restricted-ACL file at `<config>/credentials.json` (0o600 on macOS/Unix; user-only DACL on Windows — see §2.5). Show system notification once: "Could not access secure storage — credentials saved to a protected file." |
 | **Auth sources disagree (conflict)** | Fetch AccountId from both via `/api/oauth/userinfo`. If different, emit `auth_source_conflict` with both emails. AuthPanel chooser is shown; choice persisted. Polling pauses until user chooses. |
-| macOS keychain prompts every launch | Use stable `app_identifier` constant; document in README that binary-path changes (e.g., moving between /Applications and ~/Downloads) re-trigger prompt. |
+| `<config>/credentials.json` write failure (disk full, perms) | Token kept in memory for the session; surface a stale-data banner. Next refresh retries the write. |
 
 ### Network failures
 

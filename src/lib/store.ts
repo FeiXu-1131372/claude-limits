@@ -1,8 +1,13 @@
 import { create } from 'zustand';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import type { UnlistenFn } from '@tauri-apps/api/event';
 import { ipc } from './ipc';
 import { subscribe, type AppEvent } from './events';
 import type { CachedUsage, Settings } from './types';
+
+// Module-level unlistener registry. Lives outside the store to avoid
+// serialization and to survive HMR / React strict-mode double-invocations.
+let _unlisteners: UnlistenFn[] = [];
 
 interface AppStore {
   usage: CachedUsage | null;
@@ -21,6 +26,7 @@ interface AppStore {
   viewMode: 'compact' | 'expanded';
 
   init: () => Promise<void>;
+  cleanup: () => void;
   refreshSettings: () => Promise<void>;
   setSettings: (s: Settings) => Promise<void>;
   refreshUsage: () => Promise<void>;
@@ -41,6 +47,13 @@ export const useAppStore = create<AppStore>((set, _get) => ({
   viewMode: 'compact',
 
   async init() {
+    // Tear down any listeners from a previous init() call (React strict-mode
+    // double-invocation, HMR) so handlers don't accumulate.
+    if (_unlisteners.length > 0) {
+      _unlisteners.forEach((fn) => fn());
+      _unlisteners = [];
+    }
+
     const [usage, settings, hasClaudeCodeCreds] = await Promise.all([
       ipc.getCurrentUsage(),
       ipc.getSettings(),
@@ -48,10 +61,10 @@ export const useAppStore = create<AppStore>((set, _get) => ({
     ]);
     set({ usage, settings, hasClaudeCodeCreds });
 
-    await subscribe((e: AppEvent) => {
+    _unlisteners = await subscribe((e: AppEvent) => {
       switch (e.type) {
         case 'usage_updated':
-          set({ usage: e.payload, authRequired: false, stale: false });
+          set({ usage: e.payload, authRequired: false, stale: e.payload.last_error != null });
           break;
         case 'session_ingested':
           set((s) => ({ sessionDataVersion: s.sessionDataVersion + 1 }));
@@ -68,9 +81,22 @@ export const useAppStore = create<AppStore>((set, _get) => ({
         case 'db_reset':
           set({ dbReset: true });
           break;
+        case 'watcher_error':
+          // JSONL watcher failed to start — logged here; UI can surface a
+          // banner in a future pass when dedicated watcher-error state is added.
+          console.error('[watcher_error]', e.payload);
+          break;
         case 'popover_hidden':
           set({ viewMode: 'compact' });
           ipc.resizeWindow('compact').catch(() => {});
+          break;
+        case 'popover_shown':
+          // Drive the appear animation: globals.css watches
+          // body[data-appearing="true"] and runs a one-shot keyframe.
+          document.body.dataset.appearing = 'true';
+          window.setTimeout(() => {
+            delete document.body.dataset.appearing;
+          }, 240);
           break;
       }
     });
@@ -82,15 +108,21 @@ export const useAppStore = create<AppStore>((set, _get) => ({
     // the truth.
     try {
       const win = getCurrentWindow();
-      await win.onFocusChanged(({ payload: focused }) => {
+      const focusUnlisten = await win.onFocusChanged(({ payload: focused }) => {
         if (!focused) return;
         ipc.getCurrentUsage().then((u) => {
           if (u) set({ usage: u, stale: false });
         }).catch(() => {});
       });
+      _unlisteners.push(focusUnlisten);
     } catch {
       // Outside Tauri (e.g. localhost demo page) — no focus tracking.
     }
+  },
+
+  cleanup() {
+    _unlisteners.forEach((fn) => fn());
+    _unlisteners = [];
   },
 
   async refreshSettings() {

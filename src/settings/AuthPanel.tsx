@@ -37,16 +37,15 @@ export function AuthPanel() {
       setError(toMessage(e, 'Failed to start sign-in.'));
       return;
     }
-    setAuthorizeUrl(url);
-    setStep('paste');
     try {
       await openUrl(url);
     } catch (e) {
-      // Browser open failed — user can still copy the URL we just exposed.
       setError(
         `Could not open your browser (${toMessage(e, 'unknown error')}). Copy the link below and open it manually.`,
       );
     }
+    setAuthorizeUrl(url);
+    setStep('paste');
   }
 
   async function submit() {
@@ -112,6 +111,7 @@ export function AuthPanel() {
           <div className="flex flex-col gap-[var(--space-sm)]">
             <Card hover className="p-[var(--space-md)]">
               <button
+                type="button"
                 onClick={startOauth}
                 className="w-full flex items-center gap-[var(--space-sm)] text-left"
               >
@@ -132,6 +132,7 @@ export function AuthPanel() {
             {hasClaudeCodeCreds && (
               <Card hover className="p-[var(--space-md)]">
                 <button
+                  type="button"
                   onClick={useLocal}
                   className="w-full flex items-center gap-[var(--space-sm)] text-left"
                 >

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { Toggle } from '../components/ui/Toggle';
 import { Slider } from '../components/ui/Slider';
@@ -18,11 +18,9 @@ export function SettingsPanel() {
   const usage = useAppStore((s) => s.usage);
   const hasClaudeCodeCreds = useAppStore((s) => s.hasClaudeCodeCreds);
   const storeSignOut = useAppStore((s) => s.signOut);
-  const [local, setLocal] = useState<Settings | null>(settings);
+  const [local, setLocal] = useState<Settings | null>(() => settings);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-
-  useEffect(() => setLocal(settings), [settings]);
 
   if (!local) return <p className="text-[color:var(--color-text-muted)]">Loading...</p>;
 
@@ -63,11 +61,11 @@ export function SettingsPanel() {
     await storeSignOut();
   }
 
-  // Show actual auth state instead of hardcoding "OAuth".
+  const authSourceLabel = (src: string) => src === 'ClaudeCode' ? 'Claude Code' : src;
   const accountStatus = usage
-    ? { connected: true, email: usage.account_email, source: 'OAuth' as const }
+    ? { connected: true, email: usage.account_email, source: authSourceLabel(usage.auth_source) }
     : hasClaudeCodeCreds
-      ? { connected: true, email: null, source: 'Claude Code' as const }
+      ? { connected: true, email: null, source: 'Claude Code' }
       : { connected: false, email: null, source: null };
 
   return (

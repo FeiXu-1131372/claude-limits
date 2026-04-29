@@ -9,8 +9,9 @@ pub use orchestrator::{AccountInfo, AuthError, AuthOrchestrator, AuthResult};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use zeroize::ZeroizeOnDrop;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, specta::Type)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, specta::Type)]
 pub enum AuthSource {
     OAuth,
     ClaudeCode,
@@ -19,9 +20,10 @@ pub enum AuthSource {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, specta::Type)]
 pub struct AccountId(pub String);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ZeroizeOnDrop)]
 pub struct StoredToken {
     pub access_token: String,
     pub refresh_token: Option<String>,
+    #[zeroize(skip)]
     pub expires_at: DateTime<Utc>,
 }

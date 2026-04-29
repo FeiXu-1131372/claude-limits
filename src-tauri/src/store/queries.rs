@@ -1,8 +1,10 @@
 use super::Db;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, OptionalExtension, Transaction};
 use serde::{Deserialize, Serialize};
+
+use crate::app_state::Settings;
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct StoredAccount {
@@ -29,6 +31,37 @@ pub struct StoredSessionEvent {
     /// when both are present in the JSONL line, else "{source_file}:{source_line}"
     /// as a structural fallback for older / pre-requestId schemas.
     pub event_id: String,
+}
+
+fn insert_events_in_tx(tx: &Transaction<'_>, events: &[StoredSessionEvent]) -> Result<usize> {
+    if events.is_empty() {
+        return Ok(0);
+    }
+    let mut stmt = tx.prepare(
+        "INSERT OR IGNORE INTO session_events
+        (ts, project, model, input_tokens, output_tokens, cache_read_tokens,
+         cache_creation_5m_tokens, cache_creation_1h_tokens, cost_usd,
+         source_file, source_line, event_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+    )?;
+    let mut inserted = 0;
+    for e in events {
+        inserted += stmt.execute(params![
+            e.ts.timestamp(),
+            e.project,
+            e.model,
+            e.input_tokens as i64,
+            e.output_tokens as i64,
+            e.cache_read_tokens as i64,
+            e.cache_creation_5m_tokens as i64,
+            e.cache_creation_1h_tokens as i64,
+            e.cost_usd,
+            e.source_file,
+            e.source_line,
+            e.event_id,
+        ])?;
+    }
+    Ok(inserted)
 }
 
 impl Db {
@@ -80,33 +113,7 @@ impl Db {
         }
         let mut conn = self.conn();
         let tx = conn.transaction()?;
-        let mut inserted = 0;
-        {
-            let mut stmt = tx.prepare(
-                "INSERT OR IGNORE INTO session_events
-                (ts, project, model, input_tokens, output_tokens, cache_read_tokens,
-                 cache_creation_5m_tokens, cache_creation_1h_tokens, cost_usd,
-                 source_file, source_line, event_id)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-            )?;
-            for e in events {
-                let n = stmt.execute(params![
-                    e.ts.timestamp(),
-                    e.project,
-                    e.model,
-                    e.input_tokens as i64,
-                    e.output_tokens as i64,
-                    e.cache_read_tokens as i64,
-                    e.cache_creation_5m_tokens as i64,
-                    e.cache_creation_1h_tokens as i64,
-                    e.cost_usd,
-                    e.source_file,
-                    e.source_line,
-                    e.event_id,
-                ])?;
-                inserted += n;
-            }
-        }
+        let inserted = insert_events_in_tx(&tx, events)?;
         tx.commit()?;
         Ok(inserted)
     }
@@ -168,10 +175,43 @@ impl Db {
     pub fn set_cursor(&self, file: &str, mtime_ns: i64, offset: i64) -> Result<()> {
         self.conn().execute(
             "INSERT INTO jsonl_cursors (file_path, last_mtime_ns, byte_offset) VALUES (?1, ?2, ?3)
-             ON CONFLICT(file_path) DO UPDATE SET last_mtime_ns=excluded.last_mtime_ns, byte_offset=excluded.byte_offset",
+             ON CONFLICT(file_path) DO UPDATE SET
+               last_mtime_ns = MAX(excluded.last_mtime_ns, jsonl_cursors.last_mtime_ns),
+               byte_offset   = MAX(excluded.byte_offset,   jsonl_cursors.byte_offset)",
             params![file, mtime_ns, offset],
         )?;
         Ok(())
+    }
+
+    /// Insert events and advance the JSONL cursor in a single SQLite
+    /// transaction. This prevents the race where two concurrent callers
+    /// (backfill task + watcher) split the two writes across transactions,
+    /// letting the slower caller's cursor write regress the faster caller's
+    /// progress and causing repeated re-ingestion of the same lines.
+    /// Insert events and advance the JSONL cursor in a single SQLite
+    /// transaction. This prevents the race where two concurrent callers
+    /// (backfill task + watcher) split the two writes across transactions,
+    /// letting the slower caller's cursor write regress the faster caller's
+    /// progress and causing repeated re-ingestion of the same lines.
+    pub fn ingest_atomic(
+        &self,
+        file: &str,
+        events: &[StoredSessionEvent],
+        mtime_ns: i64,
+        byte_offset: i64,
+    ) -> Result<usize> {
+        let mut conn = self.conn();
+        let tx = conn.transaction()?;
+        let inserted = insert_events_in_tx(&tx, events)?;
+        tx.execute(
+            "INSERT INTO jsonl_cursors (file_path, last_mtime_ns, byte_offset) VALUES (?1, ?2, ?3)
+             ON CONFLICT(file_path) DO UPDATE SET
+               last_mtime_ns = MAX(excluded.last_mtime_ns, jsonl_cursors.last_mtime_ns),
+               byte_offset   = MAX(excluded.byte_offset,   jsonl_cursors.byte_offset)",
+            params![file, mtime_ns, byte_offset],
+        )?;
+        tx.commit()?;
+        Ok(inserted)
     }
 
     pub fn notification_last_fired(
@@ -206,6 +246,38 @@ impl Db {
             params![account_id, bucket, threshold, at.timestamp()],
         )?;
         Ok(())
+    }
+
+    /// Persist user settings to the `settings` table as a single JSON blob
+    /// keyed on `"settings"`. Subsequent calls overwrite the previous value.
+    pub fn save_settings(&self, settings: &Settings) -> Result<()> {
+        let json = serde_json::to_string(settings)?;
+        self.conn().execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES ('settings', ?1)",
+            params![json],
+        )?;
+        Ok(())
+    }
+
+    /// Load user settings from the `settings` table. Returns `None` when no
+    /// row has been written yet (first launch), so the caller can fall back to
+    /// `Settings::default()`.
+    pub fn load_settings(&self) -> Result<Option<Settings>> {
+        let conn = self.conn();
+        let row = conn
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'settings'",
+                [],
+                |r| r.get::<_, String>(0),
+            )
+            .optional()?;
+        match row {
+            None => Ok(None),
+            Some(json) => {
+                let settings = serde_json::from_str(&json)?;
+                Ok(Some(settings))
+            }
+        }
     }
 }
 
@@ -311,6 +383,40 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(got.timestamp(), now.timestamp());
+    }
+
+    #[test]
+    fn settings_roundtrip() {
+        let (_dir, db) = fresh_db();
+
+        // No row written yet — should return None.
+        assert!(db.load_settings().unwrap().is_none());
+
+        // Write non-default settings.
+        let s = Settings {
+            polling_interval_secs: 60,
+            thresholds: vec![50, 80, 95],
+            theme: "dark".into(),
+            launch_at_login: true,
+            crash_reports: true,
+            preferred_auth_source: None,
+        };
+        db.save_settings(&s).unwrap();
+
+        // Read back and assert every field survived the round-trip.
+        let loaded = db.load_settings().unwrap().expect("settings row");
+        assert_eq!(loaded.polling_interval_secs, s.polling_interval_secs);
+        assert_eq!(loaded.thresholds, s.thresholds);
+        assert_eq!(loaded.theme, s.theme);
+        assert_eq!(loaded.launch_at_login, s.launch_at_login);
+        assert_eq!(loaded.crash_reports, s.crash_reports);
+
+        // Overwrite and confirm the latest value wins (UPSERT).
+        let s2 = Settings { polling_interval_secs: 120, ..Settings::default() };
+        db.save_settings(&s2).unwrap();
+        let loaded2 = db.load_settings().unwrap().expect("updated settings row");
+        assert_eq!(loaded2.polling_interval_secs, 120);
+        assert_eq!(loaded2.theme, Settings::default().theme);
     }
 
     #[test]
