@@ -61,6 +61,8 @@ pub fn run() {
             commands::get_settings,
             commands::resize_window,
             commands::force_refresh,
+            commands::check_for_updates_now,
+            commands::install_update,
         ]);
 
     #[cfg(debug_assertions)]
@@ -82,6 +84,8 @@ pub fn run() {
             commands::get_settings,
             commands::resize_window,
             commands::force_refresh,
+            commands::check_for_updates_now,
+            commands::install_update,
             commands::debug_force_threshold,
         ]);
 
@@ -96,6 +100,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(app_state)
+        .manage(std::sync::Arc::new(crate::updater::UpdaterGuard::default()))
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             use tauri::Manager;
             if let Some(w) = app.get_webview_window("popover") {
@@ -112,6 +117,7 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(specta_builder.invoke_handler())
         .setup(|app| {
             use tauri::Manager;
@@ -224,6 +230,7 @@ pub fn run() {
             }
 
             poll_loop::spawn(handle.clone(), state.clone());
+            crate::updater::run_scheduler(handle.clone());
 
             if let Some(root) = jsonl_parser::walker::claude_projects_root() {
                 let bf_root = root.clone();
