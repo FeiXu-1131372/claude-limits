@@ -344,6 +344,10 @@ function VersionFooter() {
       const t = setTimeout(() => setTransient(null), 3000);
       return () => clearTimeout(t);
     }
+    if (status === 'available' || status === 'downloading') {
+      setTransient('checking');
+      return;
+    }
     setTransient(null);
   }, [status]);
 

@@ -158,18 +158,42 @@ pub async fn install_now(app: &AppHandle) -> Result<(), String> {
     // We re-fetch + re-download because Tauri's API doesn't expose a
     // "install the previously-staged bytes" entry point. The download
     // is small (~10MB) and the bytes are already on a CDN; this is fine.
-    // (If users complain about a delay between clicking and restart,
-    // we can revisit by holding the bytes in memory between check_and_emit
-    // and install_now.)
-    let updater = app.updater().map_err(|e| e.to_string())?;
-    let Some(update) = updater.check().await.map_err(|e| e.to_string())? else {
-        return Err("no update available".into());
+    let updater = match app.updater() {
+        Ok(u) => u,
+        Err(e) => {
+            let msg = e.to_string();
+            emit_failed(app, UpdatePhase::Install, msg.clone());
+            return Err(msg);
+        }
     };
-    let bytes = update
-        .download(|_, _| {}, || {})
-        .await
-        .map_err(|e| e.to_string())?;
-    update.install(bytes).map_err(|e| e.to_string())?;
+    let maybe_update = match updater.check().await {
+        Ok(u) => u,
+        Err(e) => {
+            let msg = e.to_string();
+            emit_failed(app, UpdatePhase::Install, msg.clone());
+            return Err(msg);
+        }
+    };
+    let Some(update) = maybe_update else {
+        let msg = "no update available".to_string();
+        emit_failed(app, UpdatePhase::Install, msg.clone());
+        return Err(msg);
+    };
+    let bytes = match update.download(|_, _| {}, || {}).await {
+        Ok(b) => b,
+        Err(e) => {
+            let msg = e.to_string();
+            // download failures during install_now should still surface as install-phase
+            // failures from the user's perspective — they clicked Install, not Check.
+            emit_failed(app, UpdatePhase::Install, msg.clone());
+            return Err(msg);
+        }
+    };
+    if let Err(e) = update.install(bytes) {
+        let msg = e.to_string();
+        emit_failed(app, UpdatePhase::Install, msg.clone());
+        return Err(msg);
+    }
     // Tauri's installer relaunches the app on success; control rarely returns here.
     app.restart();
 }
