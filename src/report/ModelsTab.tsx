@@ -46,14 +46,26 @@ export function ModelsTab() {
     [models],
   );
 
+  const radius = 50;
+  const circumference = 2 * Math.PI * radius;
+
   const segments = useMemo(() => {
-    return (models ?? []).map((m) => ({
-      ...m,
-      key: modelKey(m.model),
-      total: m.input_tokens + m.output_tokens,
-      pct: totalTokens > 0 ? ((m.input_tokens + m.output_tokens) / totalTokens) * 100 : 0,
-    }));
-  }, [models, totalTokens]);
+    let acc = 0;
+    return (models ?? []).map((m) => {
+      const pct = totalTokens > 0 ? ((m.input_tokens + m.output_tokens) / totalTokens) * 100 : 0;
+      const strokeLength = (pct / 100) * circumference;
+      const offset = acc;
+      acc += strokeLength;
+      return {
+        ...m,
+        key: modelKey(m.model),
+        total: m.input_tokens + m.output_tokens,
+        pct,
+        strokeLength,
+        offset,
+      };
+    });
+  }, [models, totalTokens, circumference]);
 
   if (error) {
     return (
@@ -79,11 +91,6 @@ export function ModelsTab() {
     );
   }
 
-  /* Donut chart via SVG */
-  const radius = 50;
-  const circumference = 2 * Math.PI * radius;
-  let accumulatedOffset = 0;
-
   return (
     <div className="flex flex-col gap-[var(--space-lg)]">
       {/* Donut chart */}
@@ -91,9 +98,7 @@ export function ModelsTab() {
         <div className="relative">
           <svg width="140" height="140" viewBox="0 0 140 140">
             {segments.map((seg) => {
-              const strokeLength = (seg.pct / 100) * circumference;
-              const offset = accumulatedOffset;
-              accumulatedOffset += strokeLength;
+              const { strokeLength, offset } = seg;
 
               const colors: Record<string, string> = {
                 opus: 'var(--color-accent)',
