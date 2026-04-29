@@ -86,6 +86,7 @@ export interface Settings {
   theme: string;
   launch_at_login: boolean;
   crash_reports: boolean;
+  preferred_auth_source?: AuthSource | null;
 }
 
 /* Frontend-only types used by UI components */

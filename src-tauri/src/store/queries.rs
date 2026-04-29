@@ -399,6 +399,7 @@ mod tests {
             theme: "dark".into(),
             launch_at_login: true,
             crash_reports: true,
+            preferred_auth_source: None,
         };
         db.save_settings(&s).unwrap();
 

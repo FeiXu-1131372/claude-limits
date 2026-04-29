@@ -27,7 +27,6 @@ pub fn run() {
     let db_recovered = db_result.recovered;
     let db = Arc::new(db_result);
     let pricing = Arc::new(jsonl_parser::PricingTable::bundled().expect("pricing"));
-    let auth = Arc::new(auth::AuthOrchestrator::new(data_dir.clone()));
     let usage_client = Arc::new(
         usage_api::UsageClient::new(env!("CARGO_PKG_VERSION").to_string()).expect("client"),
     );
@@ -39,6 +38,11 @@ pub fn run() {
             None
         })
         .unwrap_or_default();
+
+    let auth = Arc::new(auth::AuthOrchestrator::new(
+        data_dir.clone(),
+        persisted_settings.preferred_auth_source,
+    ));
 
     let app_state = Arc::new(AppState {
         db: db.clone(),

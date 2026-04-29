@@ -1,5 +1,5 @@
+use crate::auth::{AuthOrchestrator, AuthSource};
 use crate::auth::oauth_paste_back::PkcePair;
-use crate::auth::AuthOrchestrator;
 use crate::jsonl_parser::PricingTable;
 use crate::store::Db;
 use crate::usage_api::{UsageClient, UsageSnapshot};
@@ -18,6 +18,7 @@ pub struct Settings {
     pub theme: String,
     pub launch_at_login: bool,
     pub crash_reports: bool,
+    pub preferred_auth_source: Option<AuthSource>,
 }
 
 impl Default for Settings {
@@ -28,6 +29,7 @@ impl Default for Settings {
             theme: "system".into(),
             launch_at_login: false,
             crash_reports: false,
+            preferred_auth_source: None,
         }
     }
 }

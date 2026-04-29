@@ -10,7 +10,7 @@ async fn no_sources_errors_with_typed_variant() {
         return; // skip: real Claude Code creds found in keychain
     }
     let dir = tempdir().unwrap();
-    let orc = AuthOrchestrator::new(dir.path().to_path_buf());
+    let orc = AuthOrchestrator::new(dir.path().to_path_buf(), None);
     match orc.get_access_token().await {
         Err(AuthError::NoSource) => {}
         other => panic!("expected AuthError::NoSource, got {other:?}"),

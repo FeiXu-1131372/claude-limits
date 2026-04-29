@@ -41,12 +41,12 @@ pub struct AuthOrchestrator {
 }
 
 impl AuthOrchestrator {
-    pub fn new(fallback_dir: PathBuf) -> Self {
+    pub fn new(fallback_dir: PathBuf, preferred_source: Option<AuthSource>) -> Self {
         Self {
             fallback_dir,
             exchange: TokenExchange::new(),
             identity: IdentityFetcher::new(),
-            preferred_source: Mutex::new(None),
+            preferred_source: Mutex::new(preferred_source),
         }
     }
 

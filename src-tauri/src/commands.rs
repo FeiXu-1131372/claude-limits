@@ -217,6 +217,10 @@ pub async fn submit_oauth_code(
 
     *state.pending_oauth.write() = None;
     state.auth.set_preferred_source(AuthSource::OAuth).await;
+    let mut settings = state.settings.read().clone();
+    settings.preferred_auth_source = Some(AuthSource::OAuth);
+    state.db.save_settings(&settings).map_err(err_to_string)?;
+    *state.settings.write() = settings;
     Ok(())
 }
 
@@ -234,6 +238,10 @@ pub async fn pick_auth_source(
     state: State<'_, Arc<AppState>>,
 ) -> Result<(), String> {
     state.auth.set_preferred_source(source).await;
+    let mut settings = state.settings.read().clone();
+    settings.preferred_auth_source = Some(source);
+    state.db.save_settings(&settings).map_err(err_to_string)?;
+    *state.settings.write() = settings;
     Ok(())
 }
 
@@ -250,6 +258,10 @@ pub async fn sign_out(
     *state.pending_oauth.write() = None;
     crate::poll_loop::reset_stale_flag();
     tray::set_level(&app, None, None, None, None, true);
+    let mut settings = state.settings.read().clone();
+    settings.preferred_auth_source = None;
+    state.db.save_settings(&settings).map_err(err_to_string)?;
+    *state.settings.write() = settings;
     Ok(())
 }
 
