@@ -38,18 +38,18 @@ function sessionsToHeatmap(events: SessionEvent[]): HeatmapCell[] {
 function getMonthPositions(cells: HeatmapCell[]): { label: string; x: number }[] {
   const seen = new Set<string>();
   const months: { label: string; x: number }[] = [];
-  const startDay = new Date(cells[0]?.date ?? '').getDay();
+  // Monday-first: shift Sunday (0) to position 6, Mon (1) to 0, etc.
+  const startDay = (new Date(cells[0]?.date ?? '').getDay() + 6) % 7;
 
-  for (const cell of cells) {
+  cells.forEach((cell, idx) => {
     const d = new Date(cell.date);
     const key = `${d.getFullYear()}-${d.getMonth()}`;
     if (!seen.has(key)) {
       seen.add(key);
-      const idx = cells.indexOf(cell);
       const col = Math.floor((idx + startDay) / 7);
       months.push({ label: MONTH_LABELS[d.getMonth()], x: col * CELL_STEP });
     }
-  }
+  });
   return months;
 }
 
