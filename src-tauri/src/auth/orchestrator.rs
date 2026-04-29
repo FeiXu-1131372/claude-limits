@@ -95,11 +95,11 @@ impl AuthOrchestrator {
 
         match (token_oauth, token_cli, preferred) {
             (Some(t), None, _) => {
-                let refreshed = self.refresh_if_needed(t).await?;
+                let refreshed = self.refresh_if_needed(t, AuthSource::OAuth).await?;
                 self.finalize(refreshed, AuthSource::OAuth).await
             }
             (None, Some(t), _) => {
-                let refreshed = self.refresh_if_needed(t).await?;
+                let refreshed = self.refresh_if_needed(t, AuthSource::ClaudeCode).await?;
                 self.finalize(refreshed, AuthSource::ClaudeCode).await
             }
             (None, None, _) => Err(AuthError::NoSource),
@@ -111,7 +111,7 @@ impl AuthOrchestrator {
                 };
                 // Refresh regardless of source — both OAuth and ClaudeCode
                 // tokens can be refreshed via the OAuth token endpoint.
-                let refreshed = self.refresh_if_needed(chosen.0).await?;
+                let refreshed = self.refresh_if_needed(chosen.0, chosen.1).await?;
                 self.finalize(refreshed, chosen.1).await
             }
             (Some(oauth_tok), Some(cli_tok), None) => {
@@ -121,13 +121,13 @@ impl AuthOrchestrator {
                 // again would yield `invalid_grant`.  Skip the conflict check
                 // and trust the keyring (OAuth) token which is already valid.
                 if cli_tok.expires_at <= Utc::now() {
-                    let refreshed = self.refresh_if_needed(oauth_tok).await?;
+                    let refreshed = self.refresh_if_needed(oauth_tok, AuthSource::OAuth).await?;
                     return self.finalize(refreshed, AuthSource::OAuth).await;
                 }
                 // Both tokens are still live — refresh both in case either is
                 // close to expiry, then compare identities to detect conflicts.
-                let refreshed_oauth = self.refresh_if_needed(oauth_tok).await?;
-                let refreshed_cli = self.refresh_if_needed(cli_tok).await?;
+                let refreshed_oauth = self.refresh_if_needed(oauth_tok, AuthSource::OAuth).await?;
+                let refreshed_cli = self.refresh_if_needed(cli_tok, AuthSource::ClaudeCode).await?;
                 match (
                     self.fetch_identity(AuthSource::OAuth, &refreshed_oauth.access_token).await,
                     self.fetch_identity(AuthSource::ClaudeCode, &refreshed_cli.access_token).await,
@@ -176,13 +176,23 @@ impl AuthOrchestrator {
         Ok(info)
     }
 
-    async fn refresh_if_needed(&self, tok: StoredToken) -> AuthResult<StoredToken> {
+    async fn refresh_if_needed(
+        &self,
+        tok: StoredToken,
+        source: AuthSource,
+    ) -> AuthResult<StoredToken> {
         if tok.expires_at > Utc::now() + Duration::minutes(2) {
             return Ok(tok);
         }
         let refresh = tok.refresh_token.clone().ok_or(AuthError::NoRefreshToken)?;
         let new_tok = self.exchange.refresh(&refresh).await.map_err(AuthError::from)?;
-        token_store::save(&new_tok, &self.fallback_dir).await.map_err(AuthError::from)?;
+        // Only persist to our keyring entry when the source is OAuth — CLI
+        // tokens belong to Claude Code's keychain and writing to ours would
+        // (a) prompt the user for keychain access on macOS and
+        // (b) overwrite any existing OAuth token sharing the slot.
+        if source == AuthSource::OAuth {
+            token_store::save(&new_tok, &self.fallback_dir).await.map_err(AuthError::from)?;
+        }
         Ok(new_tok)
     }
 
