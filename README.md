@@ -95,6 +95,29 @@ When binaries ship, first-launch notes for unsigned apps:
 - **macOS:** `xattr -d com.apple.quarantine "/Applications/Claude Limits.app"` or right-click → Open from Finder.
 - **Windows:** SmartScreen → "More info" → "Run anyway". WebView2 is required on Windows 10 (Windows 11 ships it).
 
+## Updates
+
+Claude Limits checks for new versions automatically — on launch and every 6 hours
+while running. When a new version is downloaded and ready, a small banner appears
+at the top of the popover with an **Install & restart** button. Click it to upgrade.
+
+You can also trigger a check manually from the popover footer ("Check for updates")
+or the tray menu ("Check for Updates…").
+
+**Important:** Auto-update was added in **v0.2.0**. If you're upgrading from v0.1.x,
+you'll need to download and install v0.2.0 manually from the
+[releases page](https://github.com/FeiXu-1131372/claude-limits/releases) — the
+v0.1.x build has no updater wired up. Every release after v0.2.0 will auto-update.
+
+The app is unsigned (no paid Apple Developer ID / Windows EV cert), so the *first
+install* on a new machine still goes through the OS-specific first-launch flow
+described above. After the first install, all updates are silent — Gatekeeper /
+SmartScreen don't re-check signed-by-the-same-developer apps on update.
+
+Update integrity: every release artifact is signed with our ed25519 updater key,
+and the app refuses any update whose signature doesn't match the public key
+embedded at build time.
+
 ## Authentication
 
 By default Claude Limits reuses your existing Claude Code credentials from the OS keychain — no separate sign-in. If you'd rather authenticate independently, an OAuth 2.0 + PKCE paste-back flow is available in Settings.
