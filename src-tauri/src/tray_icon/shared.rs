@@ -29,6 +29,7 @@ pub fn text() -> Color { Color::from_rgba8(0xF0, 0xF0, 0xF0, 0xF0) }
 pub fn text_muted() -> Color { Color::from_rgba8(0x6A, 0x6A, 0x6A, 0xC0) }
 
 #[cfg(target_os = "windows")]
+#[allow(dead_code)]
 pub fn text_muted() -> Color { Color::from_rgba8(0xA0, 0xA0, 0xA0, 0xC0) }
 
 /// Returns the arc fill color for a single bucket's percentage.

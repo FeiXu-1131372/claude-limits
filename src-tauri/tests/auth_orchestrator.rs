@@ -6,7 +6,7 @@ async fn no_sources_errors_with_typed_variant() {
     // This test only passes on machines without any Claude Code credentials
     // in the system keychain. If Claude Code is installed, the orchestrator
     // will find real credentials and attempt to use them.
-    if claude_limits_lib::auth::claude_code_creds::has_creds().await {
+    if claude_limits_lib::auth::claude_code_creds::has_creds() {
         return; // skip: real Claude Code creds found in keychain
     }
     let dir = tempdir().unwrap();
