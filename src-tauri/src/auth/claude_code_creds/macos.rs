@@ -40,7 +40,7 @@ async fn discover_services() -> Result<Vec<String>> {
         Command::new("security").arg("dump-keychain").output()
     })
     .await
-    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    .map_err(io::Error::other)?;
 
     let stdout = match output {
         Ok(o) => String::from_utf8_lossy(&o.stdout).to_string(),
@@ -71,7 +71,7 @@ async fn read_one(service: String) -> Result<Option<StoredToken>> {
             .output()
     })
     .await
-    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
+    .map_err(io::Error::other)?
     .context("spawn security find-generic-password")?;
 
     if !out.status.success() {

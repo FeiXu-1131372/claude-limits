@@ -13,6 +13,10 @@ use tauri::{AppHandle, Emitter};
 
 static STALE_EMITTED: AtomicBool = AtomicBool::new(false);
 
+pub fn reset_stale_flag() {
+    STALE_EMITTED.store(false, Ordering::SeqCst);
+}
+
 pub fn spawn(handle: AppHandle, state: Arc<AppState>) {
     tauri::async_runtime::spawn(async move {
         let _ = poll_once(&handle, &state).await;

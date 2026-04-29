@@ -52,10 +52,12 @@ fn fallback_path(dir: &Path) -> PathBuf {
 
 async fn save_fallback(token: &StoredToken, dir: &Path) -> Result<()> {
     fs::create_dir_all(dir)?;
-    let p = fallback_path(dir);
+    let final_path = fallback_path(dir);
+    let tmp_path = dir.join("credentials.json.tmp");
     let payload = serde_json::to_string_pretty(token)?;
-    fs::write(&p, payload).context("write fallback credential file")?;
-    restrict_permissions(p).await?;
+    fs::write(&tmp_path, &payload).context("write temp credential file")?;
+    restrict_permissions(tmp_path.clone()).await?;
+    fs::rename(&tmp_path, &final_path).context("rename temp credential file into place")?;
     Ok(())
 }
 

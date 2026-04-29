@@ -248,6 +248,7 @@ pub async fn sign_out(
     token_store::clear(&state.fallback_dir).map_err(err_to_string)?;
     *state.cached_usage.write() = None;
     *state.pending_oauth.write() = None;
+    crate::poll_loop::reset_stale_flag();
     tray::set_level(&app, None, None, None, None, true);
     Ok(())
 }
@@ -268,6 +269,12 @@ pub async fn has_claude_code_creds() -> Result<bool, String> {
 #[command]
 #[specta::specta]
 pub async fn update_settings(s: Settings, state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    if s.polling_interval_secs < 60 {
+        return Err("polling_interval_secs must be at least 60".to_string());
+    }
+    if s.thresholds.iter().any(|&t| t > 100) {
+        return Err("threshold values must be between 0 and 100".to_string());
+    }
     state.db.save_settings(&s).map_err(|e| e.to_string())?;
     *state.settings.write() = s;
     Ok(())
