@@ -62,7 +62,6 @@ export function CompactPopover() {
     return <LoadingShell refreshing={refreshing} onRefresh={handleRefresh} onSettings={() => setView('settings')} />;
   }
 
-  const snap = usage.snapshot;
   const warn = thresholds[0] ?? 75;
   const danger = thresholds[1] ?? 90;
 
@@ -317,6 +316,3 @@ function StatusDot({ live, stale }: { live: boolean; stale: boolean }) {
   );
 }
 
-function Hairline() {
-  return <div className="mx-[var(--popover-pad)] border-t border-[var(--color-rule)]" />;
-}
