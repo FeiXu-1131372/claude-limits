@@ -205,7 +205,7 @@ pub async fn submit_oauth_code(
     let entry = state.auth.pending_oauth.read().clone();
     let pkce = match entry {
         None => return Err("No active sign-in — click 'Sign in with Claude' first".to_string()),
-        Some((pair, started_at)) if started_at.elapsed() > PKCE_TTL => {
+        Some((_pair, started_at)) if started_at.elapsed() > PKCE_TTL => {
             // Expired — drop the pair immediately to clear the secret from memory,
             // then return an error so the user re-initiates the flow.
             drop(state.auth.pending_oauth.write().take());
