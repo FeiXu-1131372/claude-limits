@@ -3,6 +3,14 @@ on:
   push:
     tags: ['v*']
 
+# Required so the workflow's GITHUB_TOKEN can create the release record and
+# upload bundle artifacts to it. Repository-default token permissions are
+# read-only since GitHub's 2023 hardening change; without this block both
+# `tauri-action` (release create) and `gh release upload` fail with
+# "Resource not accessible by integration".
+permissions:
+  contents: write
+
 jobs:
   release:
     strategy:
