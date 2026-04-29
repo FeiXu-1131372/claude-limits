@@ -90,6 +90,14 @@ export const useAppStore = create<AppStore>((set, _get) => ({
           set({ viewMode: 'compact' });
           ipc.resizeWindow('compact').catch(() => {});
           break;
+        case 'popover_shown':
+          // Drive the appear animation: globals.css watches
+          // body[data-appearing="true"] and runs a one-shot keyframe.
+          document.body.dataset.appearing = 'true';
+          window.setTimeout(() => {
+            delete document.body.dataset.appearing;
+          }, 240);
+          break;
       }
     });
 

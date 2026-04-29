@@ -319,23 +319,99 @@ pub async fn debug_force_threshold(
 #[command]
 #[specta::specta]
 pub async fn resize_window(mode: String, app: tauri::AppHandle) -> Result<(), String> {
-    use tauri::Manager;
-    if let Some(w) = app.get_webview_window("popover") {
-        match mode.as_str() {
-            "compact" => {
-                let _ = w.set_always_on_top(true);
-                let _ = w.set_resizable(false);
-                let _ = w.set_size(tauri::Size::Logical(tauri::LogicalSize::new(360.0, 380.0)));
-            }
-            "expanded" => {
-                let _ = w.set_resizable(true);
-                let _ = w.set_always_on_top(false);
-                let _ = w.set_size(tauri::Size::Logical(tauri::LogicalSize::new(960.0, 640.0)));
-                let _ = w.center();
-            }
-            _ => {}
+    use tauri::{LogicalPosition, LogicalSize, Manager, Position, Size};
+
+    let Some(w) = app.get_webview_window("popover") else {
+        return Ok(());
+    };
+
+    let target_size = match mode.as_str() {
+        "compact" => (360.0_f64, 380.0_f64),
+        "expanded" => (960.0_f64, 640.0_f64),
+        _ => return Ok(()),
+    };
+
+    // Apply flag changes upfront so the rest of the animation runs in the
+    // target mode's resize profile (resizable + always-on-top affect how
+    // window-managers respond to subsequent set_size calls on some
+    // platforms).
+    match mode.as_str() {
+        "compact" => {
+            let _ = w.set_always_on_top(true);
+            let _ = w.set_resizable(false);
         }
+        "expanded" => {
+            let _ = w.set_resizable(true);
+            let _ = w.set_always_on_top(false);
+        }
+        _ => {}
     }
+
+    // Capture the starting frame in logical coordinates so the math is
+    // resolution-independent across retina/non-retina displays.
+    let scale = w.scale_factor().map_err(|e| e.to_string())?;
+    let cur_size = w.outer_size().map_err(|e| e.to_string())?;
+    let cur_pos = w.outer_position().map_err(|e| e.to_string())?;
+    let from_w = cur_size.width as f64 / scale;
+    let from_h = cur_size.height as f64 / scale;
+    let from_x = cur_pos.x as f64 / scale;
+    let from_y = cur_pos.y as f64 / scale;
+
+    // Where to end up. Compact stays anchored at the current center (the
+    // post-animation TrayCenter snap below handles the reposition cleanly).
+    // Expanded glides to the monitor's center so the bigger window doesn't
+    // shoot off-screen when called from the tray-anchored compact view.
+    let (to_x, to_y) = if mode == "expanded" {
+        match w.current_monitor().map_err(|e| e.to_string())? {
+            Some(m) => {
+                let m_size = m.size();
+                let m_pos = m.position();
+                let mw = m_size.width as f64 / scale;
+                let mh = m_size.height as f64 / scale;
+                let mx = m_pos.x as f64 / scale;
+                let my = m_pos.y as f64 / scale;
+                (mx + (mw - target_size.0) / 2.0, my + (mh - target_size.1) / 2.0)
+            }
+            None => {
+                // Fallback: keep the center fixed.
+                let cx = from_x + from_w / 2.0;
+                let cy = from_y + from_h / 2.0;
+                (cx - target_size.0 / 2.0, cy - target_size.1 / 2.0)
+            }
+        }
+    } else {
+        let cx = from_x + from_w / 2.0;
+        let cy = from_y + from_h / 2.0;
+        (cx - target_size.0 / 2.0, cy - target_size.1 / 2.0)
+    };
+
+    // ~280ms total over 24 frames ≈ 12ms/frame. Cubic ease-out so the
+    // motion feels native (fast start, gentle settle), matching macOS
+    // Control Center / window-resize timing.
+    const STEPS: u32 = 24;
+    const STEP_MS: u64 = 12;
+
+    for i in 1..=STEPS {
+        let t = i as f64 / STEPS as f64;
+        let eased = 1.0 - (1.0 - t).powi(3);
+        let nw = from_w + (target_size.0 - from_w) * eased;
+        let nh = from_h + (target_size.1 - from_h) * eased;
+        let nx = from_x + (to_x - from_x) * eased;
+        let ny = from_y + (to_y - from_y) * eased;
+
+        let _ = w.set_size(Size::Logical(LogicalSize::new(nw, nh)));
+        let _ = w.set_position(Position::Logical(LogicalPosition::new(nx, ny)));
+        tokio::time::sleep(std::time::Duration::from_millis(STEP_MS)).await;
+    }
+
+    // Compact mode re-anchors to the tray after the animation so the
+    // popover lives where the user's eye expects it. Expanded was already
+    // animated to monitor center, no follow-up needed.
+    if mode == "compact" {
+        use tauri_plugin_positioner::{Position as TrayPos, WindowExt};
+        let _ = w.move_window(TrayPos::TrayCenter);
+    }
+
     Ok(())
 }
 

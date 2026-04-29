@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { CompactPopover } from './popover/CompactPopover';
 import { ExpandedReport } from './report/ExpandedReport';
 import { AuthPanel } from './settings/AuthPanel';
@@ -55,9 +56,35 @@ export function App() {
     return <AuthPanel />;
   }
 
-  if (viewMode === 'expanded') {
-    return <ExpandedReport />;
-  }
-
-  return <CompactPopover />;
+  // Cross-fade between the two view modes. mode="wait" so the outgoing
+  // view fully fades before the incoming one starts — matches the Rust-
+  // side window resize that runs in parallel (~280ms total) and avoids
+  // both renders fighting for the same canvas during the transition.
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      {viewMode === 'expanded' ? (
+        <motion.div
+          key="expanded"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
+          style={{ height: '100%' }}
+        >
+          <ExpandedReport />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="compact"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
+          style={{ height: '100%' }}
+        >
+          <CompactPopover />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 }

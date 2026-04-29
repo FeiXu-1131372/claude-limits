@@ -133,12 +133,13 @@ pub fn run() {
         .manage(app_state)
         .manage(std::sync::Arc::new(crate::updater::UpdaterGuard::default()))
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            use tauri::Manager;
+            use tauri::{Emitter, Manager};
             if let Some(w) = app.get_webview_window("popover") {
                 use tauri_plugin_positioner::{WindowExt, Position};
                 let _ = w.move_window(Position::TrayCenter);
                 let _ = w.show();
                 let _ = w.set_focus();
+                let _ = w.app_handle().emit("popover_shown", ());
             }
         }))
         .plugin(tauri_plugin_shell::init())
@@ -243,10 +244,12 @@ pub fn run() {
                 tray.on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(w) = app.get_webview_window("popover") {
+                            use tauri::Emitter;
                             use tauri_plugin_positioner::{WindowExt, Position};
                             let _ = w.move_window(Position::TrayCenter);
                             let _ = w.show();
                             let _ = w.set_focus();
+                            let _ = app.emit("popover_shown", ());
                         }
                     }
                     "check_updates" => {
@@ -273,10 +276,12 @@ pub fn run() {
                                 use tauri::Emitter;
                                 let _ = w.app_handle().emit("popover_hidden", ());
                             } else {
+                                use tauri::Emitter;
                                 use tauri_plugin_positioner::{WindowExt, Position};
                                 let _ = w.move_window(Position::TrayCenter);
                                 let _ = w.show();
                                 let _ = w.set_focus();
+                                let _ = w.app_handle().emit("popover_shown", ());
                             }
                         }
                     }
