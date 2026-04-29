@@ -1,6 +1,6 @@
 [package]
 name = "claude-limits"
-version = "0.1.0"
+version = "0.2.0"
 description = "Track your Claude rate limits — 5h, weekly, Opus, Sonnet"
 authors = ["Claude Limits contributors"]
 license = "MIT"
