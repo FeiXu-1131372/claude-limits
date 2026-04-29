@@ -301,3 +301,16 @@ pub async fn resize_window(mode: String, app: tauri::AppHandle) -> Result<(), St
     }
     Ok(())
 }
+
+#[command]
+#[specta::specta]
+pub async fn check_for_updates_now(app: tauri::AppHandle) -> Result<(), String> {
+    crate::updater::check_and_emit(&app).await;
+    Ok(())
+}
+
+#[command]
+#[specta::specta]
+pub async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+    crate::updater::install_now(&app).await
+}
