@@ -188,8 +188,17 @@ pub fn run() {
             use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
 
             let show = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let check_updates = MenuItem::with_id(
+                app,
+                "check_updates",
+                "Check for Updates…",
+                true,
+                None::<&str>,
+            )?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = MenuBuilder::new(app).items(&[&show, &quit]).build()?;
+            let menu = MenuBuilder::new(app)
+                .items(&[&show, &check_updates, &quit])
+                .build()?;
 
             if let Some(tray) = app.tray_by_id("main") {
                 tracing::info!("attaching menu + handlers to config-created tray");
@@ -201,6 +210,12 @@ pub fn run() {
                             let _ = w.show();
                             let _ = w.set_focus();
                         }
+                    }
+                    "check_updates" => {
+                        let app_clone = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            crate::updater::check_and_emit(&app_clone).await;
+                        });
                     }
                     "quit" => app.exit(0),
                     _ => {}
