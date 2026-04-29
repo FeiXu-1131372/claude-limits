@@ -12,6 +12,7 @@ mod version;
 use serde::Serialize;
 use specta::Type;
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Serialize, Type)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum UpdatePhase {
