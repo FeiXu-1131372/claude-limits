@@ -20,7 +20,10 @@ pub fn set_level(
     let Some(tray) = app.tray_by_id("main") else { return };
 
     let bytes = tray_icon::render(five_hour, seven_day, paused);
-    let _ = tray.set_icon(Some(Image::from_bytes(&bytes).expect("renderer produces valid png")));
+    match Image::from_bytes(&bytes) {
+        Ok(img) => { let _ = tray.set_icon(Some(img)); }
+        Err(e) => tracing::warn!("tray icon decode failed, keeping previous icon: {e}"),
+    }
     let _ = tray.set_icon_as_template(false);
 
     // Numbers live in the icon now — no separate title text alongside.
