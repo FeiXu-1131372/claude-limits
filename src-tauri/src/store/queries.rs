@@ -176,6 +176,58 @@ impl Db {
         Ok(())
     }
 
+    /// Insert events and advance the JSONL cursor in a single SQLite
+    /// transaction. This prevents the race where two concurrent callers
+    /// (backfill task + watcher) split the two writes across transactions,
+    /// letting the slower caller's cursor write regress the faster caller's
+    /// progress and causing repeated re-ingestion of the same lines.
+    pub fn ingest_atomic(
+        &self,
+        file: &str,
+        events: &[StoredSessionEvent],
+        mtime_ns: i64,
+        byte_offset: i64,
+    ) -> Result<usize> {
+        let mut conn = self.conn();
+        let tx = conn.transaction()?;
+        let mut inserted = 0;
+        if !events.is_empty() {
+            let mut stmt = tx.prepare(
+                "INSERT OR IGNORE INTO session_events
+                (ts, project, model, input_tokens, output_tokens, cache_read_tokens,
+                 cache_creation_5m_tokens, cache_creation_1h_tokens, cost_usd,
+                 source_file, source_line, event_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            )?;
+            for e in events {
+                let n = stmt.execute(params![
+                    e.ts.timestamp(),
+                    e.project,
+                    e.model,
+                    e.input_tokens as i64,
+                    e.output_tokens as i64,
+                    e.cache_read_tokens as i64,
+                    e.cache_creation_5m_tokens as i64,
+                    e.cache_creation_1h_tokens as i64,
+                    e.cost_usd,
+                    e.source_file,
+                    e.source_line,
+                    e.event_id,
+                ])?;
+                inserted += n;
+            }
+        }
+        tx.execute(
+            "INSERT INTO jsonl_cursors (file_path, last_mtime_ns, byte_offset) VALUES (?1, ?2, ?3)
+             ON CONFLICT(file_path) DO UPDATE SET
+               last_mtime_ns = MAX(excluded.last_mtime_ns, jsonl_cursors.last_mtime_ns),
+               byte_offset   = MAX(excluded.byte_offset,   jsonl_cursors.byte_offset)",
+            params![file, mtime_ns, byte_offset],
+        )?;
+        tx.commit()?;
+        Ok(inserted)
+    }
+
     pub fn notification_last_fired(
         &self,
         account_id: &str,

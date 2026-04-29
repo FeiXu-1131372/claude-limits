@@ -142,7 +142,85 @@ pub fn ingest_file(db: &Db, pricing: &PricingTable, path: &Path) -> Result<usize
             });
         }
     }
-    let inserted = db.insert_events(&stored)?;
-    db.set_cursor(&key, mtime_ns, consumed)?;
+    let inserted = db.ingest_atomic(&key, &stored, mtime_ns, consumed)?;
     Ok(inserted)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::store::Db;
+    use chrono::Utc;
+    use std::io::Write;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    /// Build a minimal assistant JSONL line that parse_event_line will accept.
+    fn assistant_line(req_id: &str, msg_id: &str) -> String {
+        format!(
+            r#"{{"type":"assistant","timestamp":"{}","cwd":"/tmp/project","requestId":"{}","message":{{"id":"{}","model":"claude-sonnet-4-6","usage":{{"input_tokens":1,"output_tokens":1}}}}}}"#,
+            Utc::now().to_rfc3339(),
+            req_id,
+            msg_id,
+        )
+    }
+
+    /// Write `lines` to a temp file inside a project sub-directory so the
+    /// walker can derive a project name from the parent directory.
+    fn write_jsonl(dir: &tempfile::TempDir, lines: &[String]) -> PathBuf {
+        let project_dir = dir.path().join("my-project");
+        std::fs::create_dir_all(&project_dir).unwrap();
+        let path = project_dir.join("session.jsonl");
+        let mut f = std::fs::File::create(&path).unwrap();
+        for line in lines {
+            writeln!(f, "{}", line).unwrap();
+        }
+        path
+    }
+
+    /// Verify that two concurrent `ingest_file` calls on the same file produce
+    /// no duplicate rows and leave the cursor at the file's end. This is the
+    /// regression test for the race where two separate `insert_events` +
+    /// `set_cursor` calls could let the slower caller regress the cursor.
+    #[test]
+    fn concurrent_ingest_no_duplicates_and_correct_cursor() {
+        let dir = tempdir().unwrap();
+        // Use a separate directory for the DB so it doesn't collide with the
+        // JSONL project sub-directory.
+        let db_dir = dir.path().join("db");
+        std::fs::create_dir_all(&db_dir).unwrap();
+        let db = Arc::new(Db::open(&db_dir).unwrap());
+        let pricing = Arc::new(PricingTable::bundled().unwrap());
+
+        let lines: Vec<String> = (0..10)
+            .map(|i| assistant_line(&format!("req_{i}"), &format!("msg_{i}")))
+            .collect();
+        let path = write_jsonl(&dir, &lines);
+        let file_len = std::fs::metadata(&path).unwrap().len() as i64;
+
+        // Spawn two threads; both race to ingest the same file.
+        let handles: Vec<_> = (0..2)
+            .map(|_| {
+                let db = Arc::clone(&db);
+                let pricing = Arc::clone(&pricing);
+                let path = path.clone();
+                std::thread::spawn(move || ingest_file(&db, &pricing, &path))
+            })
+            .collect();
+
+        let results: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+        // Both threads must succeed (the Mutex ensures they serialize).
+        for r in &results {
+            assert!(r.is_ok(), "ingest_file failed: {:?}", r);
+        }
+        // Total inserted across both threads must equal exactly 10 — no dups.
+        let total_inserted: usize = results.iter().map(|r| r.as_ref().unwrap()).sum();
+        assert_eq!(total_inserted, 10, "expected exactly 10 unique events");
+
+        // Cursor byte_offset must be at the file end (not regressed by the
+        // slower thread).
+        let key = path.display().to_string();
+        let (_mtime, offset) = db.get_cursor(&key).unwrap().expect("cursor missing");
+        assert_eq!(offset, file_len, "cursor must be at end-of-file");
+    }
 }
