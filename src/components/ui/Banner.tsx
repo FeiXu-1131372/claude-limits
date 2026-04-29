@@ -35,6 +35,7 @@ export const Banner = forwardRef<HTMLDivElement, BannerProps>(
       <span className="flex-1">{children}</span>
       {onDismiss && (
         <button
+          type="button"
           onClick={onDismiss}
           className="shrink-0 opacity-60 hover:opacity-100 transition-opacity"
           aria-label="Dismiss"

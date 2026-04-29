@@ -111,6 +111,7 @@ export function AuthPanel() {
           <div className="flex flex-col gap-[var(--space-sm)]">
             <Card hover className="p-[var(--space-md)]">
               <button
+                type="button"
                 onClick={startOauth}
                 className="w-full flex items-center gap-[var(--space-sm)] text-left"
               >
@@ -131,6 +132,7 @@ export function AuthPanel() {
             {hasClaudeCodeCreds && (
               <Card hover className="p-[var(--space-md)]">
                 <button
+                  type="button"
                   onClick={useLocal}
                   className="w-full flex items-center gap-[var(--space-sm)] text-left"
                 >

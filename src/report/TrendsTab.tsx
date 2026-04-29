@@ -59,6 +59,7 @@ export function TrendsTab() {
         {(['7d', '30d'] as const).map((r) => (
           <button
             key={r}
+            type="button"
             onClick={() => setRange(r)}
             className={[
               'px-[var(--space-sm)] py-[var(--space-2xs)]',
@@ -123,14 +124,17 @@ export function TrendsTab() {
         </div>
 
         {/* X-axis labels */}
-        <div className="flex justify-between mt-[var(--space-xs)]">
-          {visibleData
-            .filter((_, i) => i % (range === '7d' ? 1 : 5) === 0)
-            .map((day) => (
-              <span key={day.date} className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)] mono">
-                {new Date(day.date).toLocaleDateString('en-US', { day: 'numeric' })}
-              </span>
-            ))}
+        <div className="flex mt-[var(--space-xs)]">
+          {visibleData.map((day, i) => (
+            <span
+              key={day.date}
+              className="flex-1 text-[length:var(--text-micro)] text-[color:var(--color-text-muted)] mono"
+            >
+              {i % (range === '7d' ? 1 : 5) === 0
+                ? new Date(day.date).toLocaleDateString('en-US', { day: 'numeric' })
+                : null}
+            </span>
+          ))}
         </div>
       </Card>
 
