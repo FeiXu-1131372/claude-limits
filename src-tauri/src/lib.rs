@@ -20,7 +20,9 @@ pub fn run() {
     let _log_guard = logging::init(log_dir.clone());
 
     let data_dir = store::default_dir();
-    let db = Arc::new(store::Db::open(&data_dir).expect("open db"));
+    let db_result = store::Db::open(&data_dir).expect("open db");
+    let db_recovered = db_result.recovered;
+    let db = Arc::new(db_result);
     let pricing = Arc::new(jsonl_parser::PricingTable::bundled().expect("pricing"));
     let auth = Arc::new(auth::AuthOrchestrator::new(data_dir.clone()));
     let usage_client = Arc::new(
@@ -130,7 +132,7 @@ pub fn run() {
         ))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(specta_builder.invoke_handler())
-        .setup(|app| {
+        .setup(move |app| {
             use tauri::Manager;
             let handle = app.handle().clone();
             let state: Arc<AppState> = app.state::<Arc<AppState>>().inner().clone();
@@ -262,6 +264,20 @@ pub fn run() {
                 tracing::error!(
                     "tray_by_id('main') returned None — tauri.conf.json `trayIcon` block missing?"
                 );
+            }
+
+            // Emit db_reset if the DB was corrupt and had to be recreated.
+            // We do this here (inside `setup`) so the app handle is available.
+            // The event is fired from a short-lived task to avoid blocking the
+            // setup hook; the frontend subscribes before the first render, so
+            // the slight async delay is harmless.
+            if db_recovered {
+                let h = handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    use tauri::Emitter;
+                    let _ = h.emit("db_reset", ());
+                    tracing::warn!("emitted db_reset event — DB was corrupt and has been recreated");
+                });
             }
 
             poll_loop::spawn(handle.clone(), state.clone());
