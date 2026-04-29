@@ -62,7 +62,7 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
     let (token, _source, account) = match state.auth.get_access_token().await {
         Ok(t) => t,
         Err(AuthError::NoSource) => {
-            tray::set_level(handle, None, None, None, true);
+            tray::set_level(handle, None, None, None, None, true);
             // Brand-new install with no creds at all — surface the auth panel
             // explicitly. Without this the popover would just hang on "Loading…"
             // forever because no signal ever tells it that sign-in is required.
@@ -73,7 +73,7 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
             oauth_email,
             cli_email,
         }) => {
-            tray::set_level(handle, None, None, None, true);
+            tray::set_level(handle, None, None, None, None, true);
             let _ = handle.emit(
                 "auth_source_conflict",
                 json!({
@@ -85,7 +85,7 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
         }
         Err(e) => {
             tracing::warn!("auth failure: {e}");
-            tray::set_level(handle, None, None, None, true);
+            tray::set_level(handle, None, None, None, None, true);
             let _ = handle.emit("auth_required", ());
             return PollResult::Transient;
         }
@@ -117,6 +117,7 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
                 snapshot.five_hour.as_ref().map(|u| u.utilization),
                 snapshot.seven_day.as_ref().map(|u| u.utilization),
                 snapshot.five_hour.as_ref().map(|u| u.resets_at),
+                snapshot.seven_day.as_ref().map(|u| u.resets_at),
                 false,
             );
 
@@ -145,7 +146,7 @@ async fn poll_once(handle: &AppHandle, state: &AppState) -> PollResult {
         }
         FetchOutcome::Unauthorized => {
             tracing::warn!("usage api unauthorized; surfacing auth_required");
-            tray::set_level(handle, None, None, None, true);
+            tray::set_level(handle, None, None, None, None, true);
             let _ = handle.emit("auth_required", ());
             PollResult::Transient
         }

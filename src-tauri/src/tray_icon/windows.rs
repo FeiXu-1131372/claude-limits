@@ -15,7 +15,7 @@ const OUTER_R: f32 = 14.0;
 const OUTER_STROKE: f32 = 2.5;
 const INNER_R: f32 = 9.0;
 const INNER_STROKE: f32 = 2.5;
-const DIGIT_HEIGHT_PX: f32 = 15.0;
+const DIGIT_HEIGHT_PX: f32 = 12.0;
 
 pub fn render(five_hour: Option<f64>, seven_day: Option<f64>, paused: bool) -> Vec<u8> {
     let mut pixmap = Pixmap::new(SIZE, SIZE).expect("32x32 fits in memory");

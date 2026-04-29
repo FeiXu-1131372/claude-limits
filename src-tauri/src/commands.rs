@@ -237,7 +237,7 @@ pub async fn sign_out(
     token_store::clear(&state.fallback_dir).map_err(err_to_string)?;
     *state.cached_usage.write() = None;
     *state.pending_oauth.write() = None;
-    tray::set_level(&app, None, None, None, true);
+    tray::set_level(&app, None, None, None, None, true);
     Ok(())
 }
 
