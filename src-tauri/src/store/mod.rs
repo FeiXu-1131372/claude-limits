@@ -116,7 +116,7 @@ impl Db {
     }
 
     pub fn conn(&self) -> std::sync::MutexGuard<'_, Connection> {
-        self.conn.lock().expect("db mutex poisoned")
+        self.conn.lock().unwrap_or_else(|e| e.into_inner())
     }
 }
 

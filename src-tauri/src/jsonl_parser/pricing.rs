@@ -55,8 +55,12 @@ impl PricingTable {
     }
 
     pub fn lookup(&self, model: &str) -> Option<&PricingEntry> {
-        let needle = model.to_ascii_lowercase();
-        self.entries.iter().find(|e| needle.contains(&e.prefix))
+        let lower = model.to_ascii_lowercase();
+        // Strip the "claude-" vendor prefix so that both full API model IDs
+        // ("claude-sonnet-4-6-20260115") and bare family names ("sonnet-4-6")
+        // resolve correctly via starts_with on the pricing prefix.
+        let needle = lower.strip_prefix("claude-").unwrap_or(&lower);
+        self.entries.iter().find(|e| needle.starts_with(e.prefix.as_str()))
     }
 
     pub fn cost_for(

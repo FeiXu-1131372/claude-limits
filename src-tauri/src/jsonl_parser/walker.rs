@@ -20,32 +20,33 @@ pub fn discover_jsonl_files(root: &Path) -> Result<Vec<PathBuf>> {
     }
     for entry in fs::read_dir(root).context("read projects dir")? {
         let entry = entry?;
-        let meta = entry.metadata()?;
-        if !meta.is_dir() {
-            continue;
-        }
+        let path = entry.path();
+        let meta = fs::symlink_metadata(&path)?;
         if meta.file_type().is_symlink() {
             continue;
         }
-        let project_dir = entry.path();
+        if !meta.is_dir() {
+            continue;
+        }
+        let project_dir = path;
         for f in fs::read_dir(&project_dir)? {
             let f = f?;
-            let fmeta = f.metadata()?;
-            if !fmeta.is_file() {
-                continue;
-            }
+            let fpath = f.path();
+            let fmeta = fs::symlink_metadata(&fpath)?;
             if fmeta.file_type().is_symlink() {
                 continue;
             }
-            let path = f.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+            if !fmeta.is_file() {
+                continue;
+            }
+            if fpath.extension().and_then(|e| e.to_str()) != Some("jsonl") {
                 continue;
             }
             if fmeta.len() > MAX_FILE_BYTES {
-                tracing::warn!("skipping oversized file (>100MB): {}", path.display());
+                tracing::warn!("skipping oversized file (>100MB): {}", fpath.display());
                 continue;
             }
-            files.push(path);
+            files.push(fpath);
         }
     }
     Ok(files)
@@ -63,7 +64,7 @@ pub fn ingest_file(
         .modified()
         .ok()
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_nanos() as i64)
+        .map(|d| d.as_nanos().min(i64::MAX as u128) as i64)
         .unwrap_or(0);
 
     // P1-20: use to_str() so non-UTF-8 paths surface an error rather than
