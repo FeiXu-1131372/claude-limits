@@ -4,6 +4,7 @@ import { ExpandedReport } from './report/ExpandedReport';
 import { AuthPanel } from './settings/AuthPanel';
 import { AuthConflictChooser } from './settings/AuthConflictChooser';
 import { useAppStore } from './lib/store';
+import { attachUpdateListeners } from './lib/updateEvents';
 import './styles/globals.css';
 import './styles/tokens.css';
 
@@ -17,6 +18,12 @@ export function App() {
   useEffect(() => {
     init().finally(() => setInitialized(true));
   }, [init]);
+
+  useEffect(() => {
+    let teardown: (() => void) | null = null;
+    attachUpdateListeners().then((unlisten) => { teardown = unlisten; });
+    return () => { teardown?.(); };
+  }, []);
 
   // Tag the body so CSS can differentiate compact (transparent vibrancy)
   // from expanded (solid opaque background).
