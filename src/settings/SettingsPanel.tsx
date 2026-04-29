@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { Toggle } from '../components/ui/Toggle';
 import { Slider } from '../components/ui/Slider';
@@ -18,11 +18,9 @@ export function SettingsPanel() {
   const usage = useAppStore((s) => s.usage);
   const hasClaudeCodeCreds = useAppStore((s) => s.hasClaudeCodeCreds);
   const storeSignOut = useAppStore((s) => s.signOut);
-  const [local, setLocal] = useState<Settings | null>(settings);
+  const [local, setLocal] = useState<Settings | null>(() => settings);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-
-  useEffect(() => setLocal(settings), [settings]);
 
   if (!local) return <p className="text-[color:var(--color-text-muted)]">Loading...</p>;
 
