@@ -104,12 +104,13 @@ impl AuthOrchestrator {
                     let refreshed = self.refresh_if_needed(oauth_tok).await?;
                     return self.finalize(refreshed, AuthSource::OAuth).await;
                 }
-                // Both tokens are still live — refresh OAuth in case it is
+                // Both tokens are still live — refresh both in case either is
                 // close to expiry, then compare identities to detect conflicts.
                 let refreshed_oauth = self.refresh_if_needed(oauth_tok).await?;
+                let refreshed_cli = self.refresh_if_needed(cli_tok).await?;
                 match (
                     self.identity.fetch(&refreshed_oauth.access_token).await,
-                    self.identity.fetch(&cli_tok.access_token).await,
+                    self.identity.fetch(&refreshed_cli.access_token).await,
                 ) {
                     (Ok(oauth_info), Ok(cli_info)) if oauth_info.id != cli_info.id => {
                         // Confirmed two different accounts — surface the conflict.

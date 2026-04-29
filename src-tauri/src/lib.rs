@@ -330,7 +330,11 @@ pub fn run() {
                     Ok(handle) => {
                         Box::leak(Box::new(handle));
                     }
-                    Err(e) => tracing::error!("jsonl watcher failed to start: {e}"),
+                    Err(e) => {
+                        tracing::error!("jsonl watcher failed to start: {e}");
+                        use tauri::Emitter;
+                        let _ = handle.emit("watcher_error", e.to_string());
+                    }
                 }
             }
 

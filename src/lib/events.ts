@@ -11,7 +11,8 @@ export type AppEvent =
     }
   | { type: "stale_data" }
   | { type: "db_reset" }
-  | { type: "popover_hidden" };
+  | { type: "popover_hidden" }
+  | { type: "watcher_error"; payload: string };
 
 export function subscribe(
   handler: (e: AppEvent) => void,
@@ -32,5 +33,8 @@ export function subscribe(
     listen("stale_data", () => handler({ type: "stale_data" })),
     listen("db_reset", () => handler({ type: "db_reset" })),
     listen("popover_hidden", () => handler({ type: "popover_hidden" })),
+    listen<string>("watcher_error", (e) =>
+      handler({ type: "watcher_error", payload: e.payload }),
+    ),
   ]);
 }

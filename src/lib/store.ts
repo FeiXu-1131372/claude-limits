@@ -64,7 +64,7 @@ export const useAppStore = create<AppStore>((set, _get) => ({
     _unlisteners = await subscribe((e: AppEvent) => {
       switch (e.type) {
         case 'usage_updated':
-          set({ usage: e.payload, authRequired: false, stale: false });
+          set({ usage: e.payload, authRequired: false, stale: e.payload.last_error != null });
           break;
         case 'session_ingested':
           set((s) => ({ sessionDataVersion: s.sessionDataVersion + 1 }));
@@ -80,6 +80,11 @@ export const useAppStore = create<AppStore>((set, _get) => ({
           break;
         case 'db_reset':
           set({ dbReset: true });
+          break;
+        case 'watcher_error':
+          // JSONL watcher failed to start — logged here; UI can surface a
+          // banner in a future pass when dedicated watcher-error state is added.
+          console.error('[watcher_error]', e.payload);
           break;
         case 'popover_hidden':
           set({ viewMode: 'compact' });
