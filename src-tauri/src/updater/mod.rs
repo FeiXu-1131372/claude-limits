@@ -9,10 +9,15 @@ mod persistence;
 mod scheduler;
 mod version;
 
+use chrono::Utc;
 use serde::Serialize;
 use specta::Type;
+use std::path::PathBuf;
+use std::sync::Arc;
+use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_updater::UpdaterExt;
+use tokio::sync::Mutex;
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Serialize, Type)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum UpdatePhase {
@@ -22,10 +27,208 @@ pub enum UpdatePhase {
     Install,
 }
 
-#[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq)]
-pub enum UpdateOutcome {
-    UpToDate,
-    Ready { version: String },
-    Failed { phase: UpdatePhase, message: String },
+/// In-flight guard so concurrent triggers (timer + manual click) collapse
+/// into a single check.
+#[derive(Default)]
+pub struct UpdaterGuard {
+    pub busy: Mutex<bool>,
 }
+
+const EV_CHECKING: &str = "update://checking";
+const EV_UP_TO_DATE: &str = "update://up-to-date";
+const EV_AVAILABLE: &str = "update://available";
+const EV_PROGRESS: &str = "update://progress";
+const EV_READY: &str = "update://ready";
+const EV_FAILED: &str = "update://failed";
+
+pub fn data_dir(app: &AppHandle) -> PathBuf {
+    app.path()
+        .app_data_dir()
+        .unwrap_or_else(|_| std::env::temp_dir())
+}
+
+/// Single check cycle. Emits events as it progresses. Never panics.
+pub async fn check_and_emit(app: &AppHandle) {
+    // Reentrancy guard. If a check is already running, do nothing.
+    let guard = app.state::<Arc<UpdaterGuard>>();
+    {
+        let mut busy = guard.busy.lock().await;
+        if *busy {
+            tracing::debug!("update check already in flight; skipping");
+            return;
+        }
+        *busy = true;
+    }
+    let _release = ReleaseOnDrop { app: app.clone() };
+
+    let _ = app.emit(EV_CHECKING, ());
+
+    let updater = match app.updater() {
+        Ok(u) => u,
+        Err(e) => {
+            emit_failed(app, UpdatePhase::Check, format!("updater unavailable: {e}"));
+            return;
+        }
+    };
+
+    let maybe_update = match updater.check().await {
+        Ok(u) => u,
+        Err(e) => {
+            emit_failed(app, UpdatePhase::Check, format!("check failed: {e}"));
+            return;
+        }
+    };
+
+    // Persist successful check time (whether or not an update exists).
+    persistence::write_last_checked_at(&data_dir(app), Utc::now());
+
+    let Some(update) = maybe_update else {
+        let _ = app.emit(EV_UP_TO_DATE, serde_json::json!({ "checkedAt": Utc::now() }));
+        return;
+    };
+
+    let new_version = update.version.clone();
+    let _ = app.emit(
+        EV_AVAILABLE,
+        serde_json::json!({
+            "version": new_version,
+            "notes": update.body.clone().unwrap_or_default(),
+            "pubDate": update.date.map(|d| d.to_string()).unwrap_or_default(),
+        }),
+    );
+
+    // Throttled progress emit: at most 5 per second.
+    let mut last_progress_emit = std::time::Instant::now()
+        .checked_sub(std::time::Duration::from_secs(1))
+        .unwrap_or_else(std::time::Instant::now);
+    let mut downloaded: u64 = 0;
+    let app_for_progress = app.clone();
+
+    let download_result = update
+        .download(
+            move |chunk_len, content_len| {
+                downloaded += chunk_len as u64;
+                if last_progress_emit.elapsed() >= std::time::Duration::from_millis(200) {
+                    last_progress_emit = std::time::Instant::now();
+                    let _ = app_for_progress.emit(
+                        EV_PROGRESS,
+                        serde_json::json!({
+                            "downloaded": downloaded,
+                            "total": content_len.unwrap_or(0),
+                        }),
+                    );
+                }
+            },
+            || {},
+        )
+        .await;
+
+    let bytes = match download_result {
+        Ok(b) => b,
+        Err(e) => {
+            // tauri-plugin-updater's `download` performs signature verification
+            // internally; a sig failure surfaces here. Distinguish by string match
+            // — coarse but the plugin doesn't expose a typed error variant.
+            let msg = e.to_string();
+            let phase = if msg.contains("signature") || msg.contains("verify") {
+                UpdatePhase::Verify
+            } else {
+                UpdatePhase::Download
+            };
+            emit_failed(app, phase, msg);
+            return;
+        }
+    };
+
+    if let Err(e) = update.install(bytes) {
+        emit_failed(app, UpdatePhase::Install, format!("install staging failed: {e}"));
+        return;
+    }
+
+    let _ = app.emit(EV_READY, serde_json::json!({ "version": new_version }));
+}
+
+/// Triggers `update.install()` to actually run the staged installer.
+/// Tauri's plugin restarts the app for us.
+pub async fn install_now(app: &AppHandle) -> Result<(), String> {
+    // We re-fetch + re-download because Tauri's API doesn't expose a
+    // "install the previously-staged bytes" entry point. The download
+    // is small (~10MB) and the bytes are already on a CDN; this is fine.
+    // (If users complain about a delay between clicking and restart,
+    // we can revisit by holding the bytes in memory between check_and_emit
+    // and install_now.)
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let Some(update) = updater.check().await.map_err(|e| e.to_string())? else {
+        return Err("no update available".into());
+    };
+    let bytes = update
+        .download(|_, _| {}, || {})
+        .await
+        .map_err(|e| e.to_string())?;
+    update.install(bytes).map_err(|e| e.to_string())?;
+    // Tauri's installer relaunches the app on success; control rarely returns here.
+    app.restart();
+}
+
+/// Background task: on launch (after `delay_until_next_check`) and every
+/// 6h thereafter, run a single check cycle.
+pub fn run_scheduler(app: AppHandle) {
+    #[cfg(debug_assertions)]
+    {
+        tracing::info!("updater scheduler disabled in dev build");
+        let _ = app;
+        return;
+    }
+
+    #[cfg(not(debug_assertions))]
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let last = persistence::read_last_checked_at(&data_dir(&app));
+            let delay = scheduler::delay_until_next_check(Utc::now(), last);
+            let std_delay = delay
+                .to_std()
+                .unwrap_or(std::time::Duration::from_secs(0));
+            if !std_delay.is_zero() {
+                tokio::time::sleep(std_delay).await;
+            }
+            check_and_emit(&app).await;
+            // Sleep the full interval before next cycle.
+            tokio::time::sleep(std::time::Duration::from_secs(
+                (scheduler::CHECK_INTERVAL_HOURS as u64) * 3600,
+            ))
+            .await;
+        }
+    });
+}
+
+fn emit_failed(app: &AppHandle, phase: UpdatePhase, message: String) {
+    tracing::warn!(?phase, %message, "update cycle failed");
+    let _ = app.emit(
+        EV_FAILED,
+        serde_json::json!({
+            "phase": match phase {
+                UpdatePhase::Check => "check",
+                UpdatePhase::Download => "download",
+                UpdatePhase::Verify => "verify",
+                UpdatePhase::Install => "install",
+            },
+            "message": message,
+        }),
+    );
+}
+
+struct ReleaseOnDrop {
+    app: AppHandle,
+}
+impl Drop for ReleaseOnDrop {
+    fn drop(&mut self) {
+        let app = self.app.clone();
+        tauri::async_runtime::spawn(async move {
+            let guard = app.state::<Arc<UpdaterGuard>>();
+            *guard.busy.lock().await = false;
+        });
+    }
+}
+
+// Re-exported for use by `lib.rs` and `commands.rs`.
+pub use version::is_newer;
