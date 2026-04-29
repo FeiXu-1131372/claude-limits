@@ -74,7 +74,7 @@ pub struct AppState {
     pub pricing: Arc<PricingTable>,
     pub settings: RwLock<Settings>,
     pub cached_usage: RwLock<Option<CachedUsage>>,
-    pub pending_oauth: RwLock<Option<PkcePair>>,
+    pub pending_oauth: RwLock<Option<(PkcePair, std::time::Instant)>>,
     pub fallback_dir: std::path::PathBuf,
     // Wakes the poll loop early when the user requests an immediate refresh.
     pub force_refresh: Notify,

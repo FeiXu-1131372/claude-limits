@@ -176,7 +176,10 @@ pub async fn start_oauth_flow(state: State<'_, Arc<AppState>>) -> Result<String,
     use crate::auth::oauth_paste_back::{build_authorize_url, generate_pkce};
     let pkce = generate_pkce();
     let url = build_authorize_url(&pkce).map_err(err_to_string)?;
-    *state.pending_oauth.write() = Some(pkce);
+    // Explicitly drop any existing pair before replacing so secrets don't
+    // linger in memory longer than necessary.
+    let old = state.pending_oauth.write().replace((pkce, std::time::Instant::now()));
+    drop(old);
     Ok(url)
 }
 
@@ -190,11 +193,19 @@ pub async fn submit_oauth_code(
     use crate::auth::oauth_paste_back::parse_pasted_code;
     use crate::auth::token_store;
 
-    let pkce = state
-        .pending_oauth
-        .read()
-        .clone()
-        .ok_or_else(|| "No active sign-in — click 'Sign in with Claude' first".to_string())?;
+    const PKCE_TTL: std::time::Duration = std::time::Duration::from_secs(600);
+
+    let entry = state.pending_oauth.read().clone();
+    let pkce = match entry {
+        None => return Err("No active sign-in — click 'Sign in with Claude' first".to_string()),
+        Some((pair, started_at)) if started_at.elapsed() > PKCE_TTL => {
+            // Expired — drop the pair immediately to clear the secret from memory,
+            // then return an error so the user re-initiates the flow.
+            drop(state.pending_oauth.write().take());
+            return Err("Sign-in session expired (10-minute limit). Click 'Sign in with Claude' to start again.".to_string());
+        }
+        Some((pair, _)) => pair,
+    };
 
     let code = parse_pasted_code(&pasted, &pkce.state).map_err(err_to_string)?;
     let exchange = TokenExchange::new();
