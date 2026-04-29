@@ -36,7 +36,29 @@ Click the expand arrow for the full report — Sessions, Models, Trends, Project
 
 ### macOS
 
-Same layout, rendered with native vibrancy. _(Screenshots coming soon.)_
+Same layout, rendered with native vibrancy. The tray icon shows the same live ring badge in the menu bar; hover for a one-line summary, click for the popover.
+
+<p align="center">
+  <img src="docs/screenshots/macos-tray.png" alt="Menu bar status item with live percentage badge" width="320" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/macos-tray-tooltip.png" alt="Menu bar tooltip on hover — 5h and 7d percentages with reset times" width="480" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/macos-popover.png" alt="Compact popover — 5H and 7D buckets, per-model usage, pay-as-you-go" width="420" />
+</p>
+
+Click the expand arrow for the full report — Sessions, Models, Trends, Projects, Heatmap, and Cache tabs.
+
+<p align="center">
+  <img src="docs/screenshots/macos-expanded-models.png" alt="Expanded report — Models tab with per-model token breakdown" width="720" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/macos-expanded-cache.png" alt="Expanded report — Cache tab with hit rate and savings" width="720" />
+</p>
 
 ## How this is different
 
