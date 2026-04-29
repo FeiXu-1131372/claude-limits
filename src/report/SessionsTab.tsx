@@ -69,7 +69,17 @@ function aggregateSessions(events: SessionEvent[]): AggregatedSession[] {
       byFile.set(id, agg);
     }
     agg.turn_count += 1;
-    agg.total_tokens += e.input_tokens + e.output_tokens;
+    // Total must include cache tokens — otherwise the displayed number
+    // looks tiny next to the cost. Cache writes especially can dominate
+    // the bill on long Claude Code sessions (50–200K tokens per turn at
+    // $3.75/MTok Sonnet or $18.75/MTok Opus). Excluding them made users
+    // think the cost calc was broken when actually the count was.
+    agg.total_tokens +=
+      e.input_tokens +
+      e.output_tokens +
+      e.cache_read_tokens +
+      e.cache_creation_5m_tokens +
+      e.cache_creation_1h_tokens;
     agg.total_cost_usd += e.cost_usd;
     if (e.ts > agg.latest_ts) agg.latest_ts = e.ts;
     agg._modelTokens.set(
