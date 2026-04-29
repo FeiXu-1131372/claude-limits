@@ -14,9 +14,9 @@ use serde::Serialize;
 use specta::Type;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_updater::UpdaterExt;
-use tokio::sync::Mutex;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Type)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
@@ -31,7 +31,7 @@ pub enum UpdatePhase {
 /// into a single check.
 #[derive(Default)]
 pub struct UpdaterGuard {
-    pub busy: Mutex<bool>,
+    pub busy: AtomicBool,
 }
 
 const EV_CHECKING: &str = "update://checking";
@@ -51,15 +51,11 @@ pub fn data_dir(app: &AppHandle) -> PathBuf {
 pub async fn check_and_emit(app: &AppHandle) {
     // Reentrancy guard. If a check is already running, do nothing.
     let guard = app.state::<Arc<UpdaterGuard>>();
-    {
-        let mut busy = guard.busy.lock().await;
-        if *busy {
-            tracing::debug!("update check already in flight; skipping");
-            return;
-        }
-        *busy = true;
+    if guard.busy.swap(true, Ordering::AcqRel) {
+        tracing::debug!("update check already in flight; skipping");
+        return;
     }
-    let _release = ReleaseOnDrop { app: app.clone() };
+    let _release = ReleaseOnDrop { guard: guard.inner().clone() };
 
     let _ = app.emit(EV_CHECKING, ());
 
@@ -98,9 +94,7 @@ pub async fn check_and_emit(app: &AppHandle) {
     );
 
     // Throttled progress emit: at most 5 per second.
-    let mut last_progress_emit = std::time::Instant::now()
-        .checked_sub(std::time::Duration::from_secs(1))
-        .unwrap_or_else(std::time::Instant::now);
+    let mut last_progress_emit: Option<std::time::Instant> = None;
     let mut downloaded: u64 = 0;
     let app_for_progress = app.clone();
 
@@ -108,8 +102,12 @@ pub async fn check_and_emit(app: &AppHandle) {
         .download(
             move |chunk_len, content_len| {
                 downloaded += chunk_len as u64;
-                if last_progress_emit.elapsed() >= std::time::Duration::from_millis(200) {
-                    last_progress_emit = std::time::Instant::now();
+                let should_emit = match last_progress_emit {
+                    None => true,
+                    Some(t) => t.elapsed() >= std::time::Duration::from_millis(200),
+                };
+                if should_emit {
+                    last_progress_emit = Some(std::time::Instant::now());
                     let _ = app_for_progress.emit(
                         EV_PROGRESS,
                         serde_json::json!({
@@ -151,6 +149,12 @@ pub async fn check_and_emit(app: &AppHandle) {
 /// Triggers `update.install()` to actually run the staged installer.
 /// Tauri's plugin restarts the app for us.
 pub async fn install_now(app: &AppHandle) -> Result<(), String> {
+    let guard = app.state::<Arc<UpdaterGuard>>();
+    if guard.busy.swap(true, Ordering::AcqRel) {
+        return Err("an update operation is already in progress".into());
+    }
+    let _release = ReleaseOnDrop { guard: guard.inner().clone() };
+
     // We re-fetch + re-download because Tauri's API doesn't expose a
     // "install the previously-staged bytes" entry point. The download
     // is small (~10MB) and the bytes are already on a CDN; this is fine.
@@ -177,7 +181,6 @@ pub fn run_scheduler(app: AppHandle) {
     {
         tracing::info!("updater scheduler disabled in dev build");
         let _ = app;
-        return;
     }
 
     #[cfg(not(debug_assertions))]
@@ -218,15 +221,11 @@ fn emit_failed(app: &AppHandle, phase: UpdatePhase, message: String) {
 }
 
 struct ReleaseOnDrop {
-    app: AppHandle,
+    guard: Arc<UpdaterGuard>,
 }
 impl Drop for ReleaseOnDrop {
     fn drop(&mut self) {
-        let app = self.app.clone();
-        tauri::async_runtime::spawn(async move {
-            let guard = app.state::<Arc<UpdaterGuard>>();
-            *guard.busy.lock().await = false;
-        });
+        self.guard.busy.store(false, Ordering::Release);
     }
 }
 
