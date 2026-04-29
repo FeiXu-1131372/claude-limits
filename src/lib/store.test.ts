@@ -11,9 +11,11 @@ vi.mock('@tauri-apps/api/event', () => ({
 }));
 
 // Stub the Tauri window API so getCurrentWindow() doesn't throw.
+// onFocusChanged must return a spy (not undefined) because store.ts
+// now captures and stores the returned unlistener.
 vi.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: () => ({
-    onFocusChanged: vi.fn().mockResolvedValue(undefined),
+    onFocusChanged: vi.fn().mockResolvedValue(vi.fn()),
   }),
 }));
 

@@ -95,12 +95,13 @@ export const useAppStore = create<AppStore>((set, _get) => ({
     // the truth.
     try {
       const win = getCurrentWindow();
-      await win.onFocusChanged(({ payload: focused }) => {
+      const focusUnlisten = await win.onFocusChanged(({ payload: focused }) => {
         if (!focused) return;
         ipc.getCurrentUsage().then((u) => {
           if (u) set({ usage: u, stale: false });
         }).catch(() => {});
       });
+      _unlisteners.push(focusUnlisten);
     } catch {
       // Outside Tauri (e.g. localhost demo page) — no focus tracking.
     }
