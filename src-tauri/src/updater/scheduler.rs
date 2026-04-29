@@ -3,10 +3,12 @@
 
 use chrono::{DateTime, Duration, Utc};
 
+#[allow(dead_code)]
 pub const CHECK_INTERVAL_HOURS: i64 = 6;
 
 /// How long until the next check should run, given when we last checked
 /// (or `None` if never). Returns `Duration::zero()` when overdue.
+#[allow(dead_code)]
 pub fn delay_until_next_check(
     now: DateTime<Utc>,
     last_checked_at: Option<DateTime<Utc>>,

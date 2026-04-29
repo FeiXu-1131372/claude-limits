@@ -5,12 +5,14 @@
 //! — no prerelease, no build metadata — and pulling in 50KB of code for
 //! one comparison would be silly.
 
+#[allow(dead_code)]
 pub fn is_newer(running: &str, candidate: &str) -> Result<bool, String> {
     let r = parse(running)?;
     let c = parse(candidate)?;
     Ok(c > r)
 }
 
+#[allow(dead_code)]
 fn parse(s: &str) -> Result<(u32, u32, u32), String> {
     let parts: Vec<&str> = s.trim_start_matches('v').split('.').collect();
     if parts.len() != 3 {

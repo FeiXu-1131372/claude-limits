@@ -13,6 +13,7 @@ struct Persisted {
     last_checked_at: Option<DateTime<Utc>>,
 }
 
+#[allow(dead_code)]
 pub fn read_last_checked_at(data_dir: &Path) -> Option<DateTime<Utc>> {
     let path = data_dir.join(FILE_NAME);
     let bytes = std::fs::read(&path).ok()?;
@@ -20,6 +21,7 @@ pub fn read_last_checked_at(data_dir: &Path) -> Option<DateTime<Utc>> {
     parsed.last_checked_at
 }
 
+#[allow(dead_code)]
 pub fn write_last_checked_at(data_dir: &Path, when: DateTime<Utc>) {
     let path = data_dir.join(FILE_NAME);
     let payload = Persisted { last_checked_at: Some(when) };

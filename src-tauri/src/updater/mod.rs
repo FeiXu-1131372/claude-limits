@@ -229,5 +229,3 @@ impl Drop for ReleaseOnDrop {
     }
 }
 
-// Re-exported for use by `lib.rs` and `commands.rs`.
-pub use version::is_newer;
