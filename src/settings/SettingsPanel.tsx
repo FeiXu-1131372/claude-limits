@@ -61,11 +61,11 @@ export function SettingsPanel() {
     await storeSignOut();
   }
 
-  // Show actual auth state instead of hardcoding "OAuth".
+  const authSourceLabel = (src: string) => src === 'ClaudeCode' ? 'Claude Code' : src;
   const accountStatus = usage
-    ? { connected: true, email: usage.account_email, source: 'OAuth' as const }
+    ? { connected: true, email: usage.account_email, source: authSourceLabel(usage.auth_source) }
     : hasClaudeCodeCreds
-      ? { connected: true, email: null, source: 'Claude Code' as const }
+      ? { connected: true, email: null, source: 'Claude Code' }
       : { connected: false, email: null, source: null };
 
   return (

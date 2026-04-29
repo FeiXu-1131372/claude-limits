@@ -191,7 +191,7 @@ utilization_per_min: number;
  */
 projected_at_reset: number }
 export type CacheStats = { total_cache_read_tokens: number; total_cache_creation_tokens: number; estimated_savings_usd: number; hit_ratio: number }
-export type CachedUsage = { snapshot: UsageSnapshot; account_id: string; account_email: string; last_error: string | null; burn_rate?: BurnRateProjection | null }
+export type CachedUsage = { snapshot: UsageSnapshot; account_id: string; account_email: string; last_error: string | null; burn_rate?: BurnRateProjection | null; auth_source: AuthSource }
 export type DailyBucket = { date: string; input_tokens: number; output_tokens: number; cost_usd: number }
 export type ExtraUsage = { is_enabled: boolean; monthly_limit_cents?: number; used_credits_cents?: number; utilization?: number; resets_at: string | null }
 export type ModelStats = { model: string; input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_creation_tokens: number; cost_usd: number }

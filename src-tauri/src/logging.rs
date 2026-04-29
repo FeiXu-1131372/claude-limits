@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 
 pub fn init(log_dir: PathBuf) -> tracing_appender::non_blocking::WorkerGuard {
     std::fs::create_dir_all(&log_dir).ok();
@@ -11,13 +11,15 @@ pub fn init(log_dir: PathBuf) -> tracing_appender::non_blocking::WorkerGuard {
     let file_appender = RollingFileAppender::new(Rotation::DAILY, &log_dir, "claude-limits.log");
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
-    let filter = EnvFilter::try_from_default_env()
+    let file_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new("info,claude_limits_lib=debug"));
+    // Only forward warnings and above to stderr — avoids every line being
+    // written twice (file + stderr) in the common case.
+    let stderr_filter = EnvFilter::new("warn");
 
     tracing_subscriber::registry()
-        .with(filter)
-        .with(fmt::layer().with_writer(non_blocking).with_ansi(false))
-        .with(fmt::layer().with_writer(std::io::stderr))
+        .with(fmt::layer().with_writer(non_blocking).with_ansi(false).with_filter(file_filter))
+        .with(fmt::layer().with_writer(std::io::stderr).with_filter(stderr_filter))
         .init();
 
     tracing::info!("Logging initialized at {:?}", log_dir);
@@ -48,7 +50,7 @@ fn restrict_permissions(p: &Path) -> anyhow::Result<()> {
         .args([
             "/inheritance:r",
             "/grant:r",
-            &format!("{}:(OI)(CI)F", whoami::username()),
+            &format!("{}:(OI)(CI)F", std::env::var("USERNAME").unwrap_or_else(|_| "Administrator".to_string())),
         ])
         .status()
         .context("icacls failed to run")?;

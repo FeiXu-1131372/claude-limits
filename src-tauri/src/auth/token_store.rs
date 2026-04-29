@@ -83,7 +83,7 @@ async fn restrict_permissions(p: PathBuf) -> Result<()> {
 async fn restrict_permissions(p: PathBuf) -> Result<()> {
     use std::io;
     use std::process::Command;
-    let username = whoami::username();
+    let username = std::env::var("USERNAME").unwrap_or_else(|_| "Administrator".to_string());
     let status = tokio::task::spawn_blocking(move || {
         Command::new("icacls")
             .arg(&p)
