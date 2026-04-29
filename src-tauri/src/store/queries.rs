@@ -1,7 +1,7 @@
 use super::Db;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, OptionalExtension, Transaction};
 use serde::{Deserialize, Serialize};
 
 use crate::app_state::Settings;
@@ -31,6 +31,37 @@ pub struct StoredSessionEvent {
     /// when both are present in the JSONL line, else "{source_file}:{source_line}"
     /// as a structural fallback for older / pre-requestId schemas.
     pub event_id: String,
+}
+
+fn insert_events_in_tx(tx: &Transaction<'_>, events: &[StoredSessionEvent]) -> Result<usize> {
+    if events.is_empty() {
+        return Ok(0);
+    }
+    let mut stmt = tx.prepare(
+        "INSERT OR IGNORE INTO session_events
+        (ts, project, model, input_tokens, output_tokens, cache_read_tokens,
+         cache_creation_5m_tokens, cache_creation_1h_tokens, cost_usd,
+         source_file, source_line, event_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+    )?;
+    let mut inserted = 0;
+    for e in events {
+        inserted += stmt.execute(params![
+            e.ts.timestamp(),
+            e.project,
+            e.model,
+            e.input_tokens as i64,
+            e.output_tokens as i64,
+            e.cache_read_tokens as i64,
+            e.cache_creation_5m_tokens as i64,
+            e.cache_creation_1h_tokens as i64,
+            e.cost_usd,
+            e.source_file,
+            e.source_line,
+            e.event_id,
+        ])?;
+    }
+    Ok(inserted)
 }
 
 impl Db {
@@ -82,33 +113,7 @@ impl Db {
         }
         let mut conn = self.conn();
         let tx = conn.transaction()?;
-        let mut inserted = 0;
-        {
-            let mut stmt = tx.prepare(
-                "INSERT OR IGNORE INTO session_events
-                (ts, project, model, input_tokens, output_tokens, cache_read_tokens,
-                 cache_creation_5m_tokens, cache_creation_1h_tokens, cost_usd,
-                 source_file, source_line, event_id)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-            )?;
-            for e in events {
-                let n = stmt.execute(params![
-                    e.ts.timestamp(),
-                    e.project,
-                    e.model,
-                    e.input_tokens as i64,
-                    e.output_tokens as i64,
-                    e.cache_read_tokens as i64,
-                    e.cache_creation_5m_tokens as i64,
-                    e.cache_creation_1h_tokens as i64,
-                    e.cost_usd,
-                    e.source_file,
-                    e.source_line,
-                    e.event_id,
-                ])?;
-                inserted += n;
-            }
-        }
+        let inserted = insert_events_in_tx(&tx, events)?;
         tx.commit()?;
         Ok(inserted)
     }
@@ -170,12 +175,19 @@ impl Db {
     pub fn set_cursor(&self, file: &str, mtime_ns: i64, offset: i64) -> Result<()> {
         self.conn().execute(
             "INSERT INTO jsonl_cursors (file_path, last_mtime_ns, byte_offset) VALUES (?1, ?2, ?3)
-             ON CONFLICT(file_path) DO UPDATE SET last_mtime_ns=excluded.last_mtime_ns, byte_offset=excluded.byte_offset",
+             ON CONFLICT(file_path) DO UPDATE SET
+               last_mtime_ns = MAX(excluded.last_mtime_ns, jsonl_cursors.last_mtime_ns),
+               byte_offset   = MAX(excluded.byte_offset,   jsonl_cursors.byte_offset)",
             params![file, mtime_ns, offset],
         )?;
         Ok(())
     }
 
+    /// Insert events and advance the JSONL cursor in a single SQLite
+    /// transaction. This prevents the race where two concurrent callers
+    /// (backfill task + watcher) split the two writes across transactions,
+    /// letting the slower caller's cursor write regress the faster caller's
+    /// progress and causing repeated re-ingestion of the same lines.
     /// Insert events and advance the JSONL cursor in a single SQLite
     /// transaction. This prevents the race where two concurrent callers
     /// (backfill task + watcher) split the two writes across transactions,
@@ -190,33 +202,7 @@ impl Db {
     ) -> Result<usize> {
         let mut conn = self.conn();
         let tx = conn.transaction()?;
-        let mut inserted = 0;
-        if !events.is_empty() {
-            let mut stmt = tx.prepare(
-                "INSERT OR IGNORE INTO session_events
-                (ts, project, model, input_tokens, output_tokens, cache_read_tokens,
-                 cache_creation_5m_tokens, cache_creation_1h_tokens, cost_usd,
-                 source_file, source_line, event_id)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-            )?;
-            for e in events {
-                let n = stmt.execute(params![
-                    e.ts.timestamp(),
-                    e.project,
-                    e.model,
-                    e.input_tokens as i64,
-                    e.output_tokens as i64,
-                    e.cache_read_tokens as i64,
-                    e.cache_creation_5m_tokens as i64,
-                    e.cache_creation_1h_tokens as i64,
-                    e.cost_usd,
-                    e.source_file,
-                    e.source_line,
-                    e.event_id,
-                ])?;
-                inserted += n;
-            }
-        }
+        let inserted = insert_events_in_tx(&tx, events)?;
         tx.execute(
             "INSERT INTO jsonl_cursors (file_path, last_mtime_ns, byte_offset) VALUES (?1, ?2, ?3)
              ON CONFLICT(file_path) DO UPDATE SET
