@@ -6,6 +6,38 @@ A menu-bar app for tracking your Claude rate limits — 5-hour, weekly, and per-
 
 That's the question Claude Limits answers. The numbers are the same ones the Anthropic console shows, just always visible in your menu bar so you don't have to remember to check.
 
+## Screenshots
+
+### Windows 11
+
+The tray icon shows the live 5-hour percentage as a ring badge — the answer to "where am I at?" is visible without opening anything. Hover for a one-line text summary; click for the full popover.
+
+<p align="center">
+  <img src="docs/screenshots/windows-tray.png" alt="System tray with live percentage badge" width="320" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/windows-tray-tooltip.png" alt="Tray tooltip on hover — 5h and 7d percentages with reset times" width="480" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/windows-popover.png" alt="Compact popover — 5H and 7D buckets, per-model usage, pay-as-you-go" width="420" />
+</p>
+
+Click the expand arrow for the full report — Sessions, Models, Trends, Projects, Heatmap, and Cache tabs.
+
+<p align="center">
+  <img src="docs/screenshots/windows-expanded-models.png" alt="Expanded report — Models tab with per-model token breakdown" width="720" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/windows-expanded-heatmap.png" alt="Expanded report — Heatmap tab showing six months of usage" width="720" />
+</p>
+
+### macOS
+
+Same layout, rendered with native vibrancy. _(Screenshots coming soon.)_
+
 ## How this is different
 
 There are several Claude usage trackers out there. Most fall into one of two shapes:
