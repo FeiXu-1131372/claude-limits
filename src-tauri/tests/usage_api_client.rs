@@ -37,7 +37,7 @@ async fn handles_429() {
     let c = UsageClient::with_base_url(server.url(), "0.0.0-test".into()).unwrap();
     assert!(matches!(
         c.fetch("tok").await,
-        FetchOutcome::RateLimited
+        FetchOutcome::RateLimited(_)
     ));
 }
 
