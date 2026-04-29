@@ -50,6 +50,23 @@ impl AuthOrchestrator {
         }
     }
 
+    /// Construct with explicitly provided collaborators.  Intended for tests
+    /// that need to inject mock-endpoint `TokenExchange` / `IdentityFetcher`
+    /// instances built via their `with_endpoint` constructors.
+    pub fn with_collaborators(
+        fallback_dir: PathBuf,
+        preferred_source: Option<AuthSource>,
+        exchange: TokenExchange,
+        identity: IdentityFetcher,
+    ) -> Self {
+        Self {
+            fallback_dir,
+            exchange,
+            identity,
+            preferred_source: Mutex::new(preferred_source),
+        }
+    }
+
     pub async fn get_access_token(&self) -> AuthResult<(String, AuthSource, AccountInfo)> {
         let preferred = *self.preferred_source.lock().await;
 
