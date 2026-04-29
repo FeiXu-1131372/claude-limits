@@ -3,8 +3,10 @@
 //! on every call.
 
 pub mod digits;
-pub mod macos;
 pub mod shared;
+#[cfg(not(target_os = "windows"))]
+pub mod macos;
+#[cfg(target_os = "windows")]
 pub mod windows;
 
 /// Renders the tray icon for the given usage state. Returns PNG bytes ready
