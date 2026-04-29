@@ -100,7 +100,7 @@ function BurnRateCaption({
   warnAt,
   dangerAt,
 }: {
-  burnRate: BurnRateProjection | null;
+  burnRate: BurnRateProjection | null | undefined;
   warnAt: number;
   dangerAt: number;
 }) {

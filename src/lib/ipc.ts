@@ -1,42 +1,30 @@
-import { invoke } from "@tauri-apps/api/core";
-import type {
-  AuthSource,
-  CachedUsage,
-  CacheStats,
-  DailyBucket,
-  ModelStats,
-  ProjectStats,
-  SessionEvent,
-  Settings,
-} from "./types";
+import { commands, type Result } from './generated/bindings';
+import type { AuthSource, Settings } from './types';
+
+/** Unwrap a specta-generated Result, throwing on error. */
+async function unwrap<T>(r: Result<T, string>): Promise<T> {
+  if (r.status === 'error') throw new Error(r.error);
+  return r.data;
+}
 
 export const ipc = {
-  getCurrentUsage: () => invoke<CachedUsage | null>("get_current_usage"),
-  getSessionHistory: (days: number) =>
-    invoke<SessionEvent[]>("get_session_history", { days }),
-  getDailyTrends: (days: number) =>
-    invoke<DailyBucket[]>("get_daily_trends", { days }),
-  getModelBreakdown: (days: number) =>
-    invoke<ModelStats[]>("get_model_breakdown", { days }),
-  getProjectBreakdown: (days: number) =>
-    invoke<ProjectStats[]>("get_project_breakdown", { days }),
-  getCacheStats: (days: number) =>
-    invoke<CacheStats>("get_cache_stats", { days }),
+  getCurrentUsage: () => commands.getCurrentUsage().then(unwrap),
+  getSessionHistory: (days: number) => commands.getSessionHistory(days).then(unwrap),
+  getDailyTrends: (days: number) => commands.getDailyTrends(days).then(unwrap),
+  getModelBreakdown: (days: number) => commands.getModelBreakdown(days).then(unwrap),
+  getProjectBreakdown: (days: number) => commands.getProjectBreakdown(days).then(unwrap),
+  getCacheStats: (days: number) => commands.getCacheStats(days).then(unwrap),
 
-  startOauthFlow: () => invoke<string>("start_oauth_flow"),
-  submitOauthCode: (pasted: string) =>
-    invoke<void>("submit_oauth_code", { pasted }),
-  useClaudeCodeCreds: () => invoke<void>("use_claude_code_creds"),
-  pickAuthSource: (source: AuthSource) =>
-    invoke<void>("pick_auth_source", { source }),
-  signOut: () => invoke<void>("sign_out"),
-  hasClaudeCodeCreds: () => invoke<boolean>("has_claude_code_creds"),
+  startOauthFlow: () => commands.startOauthFlow().then(unwrap),
+  submitOauthCode: (pasted: string) => commands.submitOauthCode(pasted).then(unwrap),
+  useClaudeCodeCreds: () => commands.useClaudeCodeCreds().then(unwrap),
+  pickAuthSource: (source: AuthSource) => commands.pickAuthSource(source).then(unwrap),
+  signOut: () => commands.signOut().then(unwrap),
+  hasClaudeCodeCreds: () => commands.hasClaudeCodeCreds().then(unwrap),
 
-  getSettings: () => invoke<Settings>("get_settings"),
-  updateSettings: (s: Settings) =>
-    invoke<void>("update_settings", { s }),
+  getSettings: () => commands.getSettings().then(unwrap),
+  updateSettings: (s: Settings) => commands.updateSettings(s).then(unwrap),
 
-  resizeWindow: (mode: 'compact' | 'expanded') =>
-    invoke<void>('resize_window', { mode }),
-  forceRefresh: () => invoke<void>("force_refresh"),
+  resizeWindow: (mode: 'compact' | 'expanded') => commands.resizeWindow(mode).then(unwrap),
+  forceRefresh: () => commands.forceRefresh().then(unwrap),
 };
