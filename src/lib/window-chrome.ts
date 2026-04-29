@@ -1,5 +1,6 @@
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { getCurrentWindow, LogicalPosition } from '@tauri-apps/api/window';
+import { emit } from '@tauri-apps/api/event';
 
 /**
  * Manual window-drag implementation. Tauri's `data-tauri-drag-region` and
@@ -55,7 +56,9 @@ export async function handleDragStart(e: ReactPointerEvent<HTMLElement>) {
 
 export async function closeWindow() {
   try {
-    await getCurrentWindow().hide();
+    const win = getCurrentWindow();
+    await win.hide();
+    await emit('popover_hidden');
   } catch {
     // No-op outside Tauri or if the window's already hidden.
   }

@@ -104,6 +104,8 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             use tauri::Manager;
             if let Some(w) = app.get_webview_window("popover") {
+                use tauri_plugin_positioner::{WindowExt, Position};
+                let _ = w.move_window(Position::TrayCenter);
                 let _ = w.show();
                 let _ = w.set_focus();
             }
@@ -113,6 +115,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -143,11 +146,13 @@ pub fn run() {
                 // window, after which get_webview_window("popover") returns None
                 // and the app can never reopen. Hide instead so the window
                 // survives for next show().
+                use tauri::Emitter;
                 let popover_clone = popover.clone();
                 popover.on_window_event(move |ev| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = ev {
                         api.prevent_close();
                         let _ = popover_clone.hide();
+                        let _ = popover_clone.app_handle().emit("popover_hidden", ());
                     }
                 });
             }
@@ -207,6 +212,8 @@ pub fn run() {
                 tray.on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(w) = app.get_webview_window("popover") {
+                            use tauri_plugin_positioner::{WindowExt, Position};
+                            let _ = w.move_window(Position::TrayCenter);
                             let _ = w.show();
                             let _ = w.set_focus();
                         }
@@ -221,6 +228,7 @@ pub fn run() {
                     _ => {}
                 });
                 tray.on_tray_icon_event(|tray, event| {
+                    tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);
                     if let TrayIconEvent::Click {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
@@ -231,7 +239,11 @@ pub fn run() {
                         if let Some(w) = app.get_webview_window("popover") {
                             if w.is_visible().unwrap_or(false) {
                                 let _ = w.hide();
+                                use tauri::Emitter;
+                                let _ = w.app_handle().emit("popover_hidden", ());
                             } else {
+                                use tauri_plugin_positioner::{WindowExt, Position};
+                                let _ = w.move_window(Position::TrayCenter);
                                 let _ = w.show();
                                 let _ = w.set_focus();
                             }

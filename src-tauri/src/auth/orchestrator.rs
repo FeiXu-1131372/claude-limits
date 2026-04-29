@@ -61,7 +61,10 @@ impl AuthOrchestrator {
                 let refreshed = self.refresh_if_needed(t).await?;
                 self.finalize(refreshed, AuthSource::OAuth).await
             }
-            (None, Some(t), _) => self.finalize(t, AuthSource::ClaudeCode).await,
+            (None, Some(t), _) => {
+                let refreshed = self.refresh_if_needed(t).await?;
+                self.finalize(refreshed, AuthSource::ClaudeCode).await
+            }
             (None, None, _) => Err(AuthError::NoSource),
             (Some(a), Some(b), Some(pref)) => {
                 let chosen = if pref == AuthSource::OAuth {
@@ -69,32 +72,49 @@ impl AuthOrchestrator {
                 } else {
                     (b, AuthSource::ClaudeCode)
                 };
-                let refreshed = if chosen.1 == AuthSource::OAuth {
-                    self.refresh_if_needed(chosen.0).await?
-                } else {
-                    chosen.0
-                };
+                // Refresh regardless of source — both OAuth and ClaudeCode
+                // tokens can be refreshed via the OAuth token endpoint.
+                let refreshed = self.refresh_if_needed(chosen.0).await?;
                 self.finalize(refreshed, chosen.1).await
             }
             (Some(oauth_tok), Some(cli_tok), None) => {
-                let oauth_info = self
-                    .identity
-                    .fetch(&oauth_tok.access_token)
-                    .await
-                    .map_err(AuthError::from)?;
-                let cli_info = self
-                    .identity
-                    .fetch(&cli_tok.access_token)
-                    .await
-                    .map_err(AuthError::from)?;
-                if oauth_info.id == cli_info.id {
+                // If the CLI file token is already expired we must not try to
+                // refresh it here: its refresh token was rotated the last time
+                // the app refreshed it into the keyring, so calling refresh
+                // again would yield `invalid_grant`.  Skip the conflict check
+                // and trust the keyring (OAuth) token which is already valid.
+                if cli_tok.expires_at <= Utc::now() {
                     let refreshed = self.refresh_if_needed(oauth_tok).await?;
-                    self.finalize(refreshed, AuthSource::OAuth).await
-                } else {
-                    Err(AuthError::Conflict {
-                        oauth_email: oauth_info.email,
-                        cli_email: cli_info.email,
-                    })
+                    return self.finalize(refreshed, AuthSource::OAuth).await;
+                }
+                // Both tokens are still live — refresh OAuth in case it is
+                // close to expiry, then compare identities to detect conflicts.
+                let refreshed_oauth = self.refresh_if_needed(oauth_tok).await?;
+                match (
+                    self.identity.fetch(&refreshed_oauth.access_token).await,
+                    self.identity.fetch(&cli_tok.access_token).await,
+                ) {
+                    (Ok(oauth_info), Ok(cli_info)) if oauth_info.id != cli_info.id => {
+                        // Confirmed two different accounts — surface the conflict.
+                        Err(AuthError::Conflict {
+                            oauth_email: oauth_info.email,
+                            cli_email: cli_info.email,
+                        })
+                    }
+                    (Err(e), _) | (_, Err(e)) => {
+                        // One or both identity fetches failed (e.g. 404 for
+                        // Claude Code tokens).  We cannot confirm a conflict, so
+                        // prefer the keyring token and log a warning.
+                        tracing::warn!(
+                            "could not verify both account identities; \
+                             defaulting to OAuth keyring token: {e}"
+                        );
+                        self.finalize(refreshed_oauth, AuthSource::OAuth).await
+                    }
+                    _ => {
+                        // Same account (or one returned Ok and ids match).
+                        self.finalize(refreshed_oauth, AuthSource::OAuth).await
+                    }
                 }
             }
         }
@@ -119,26 +139,16 @@ impl AuthOrchestrator {
         tok: StoredToken,
         source: AuthSource,
     ) -> AuthResult<(String, AuthSource, AccountInfo)> {
-        // Identity is non-essential for the single-source case: it powers the
-        // conflict chooser and the Account section in Settings. If the userinfo
-        // endpoint is unreachable (404, network error, etc.) we'd rather let
-        // the app keep polling usage than lock the user out entirely.
-        let acc = match self.identity.fetch(&tok.access_token).await {
-            Ok(info) => AccountInfo {
-                id: (&info).into(),
-                email: info.email,
-                display_name: info.name,
-            },
-            Err(e) => {
-                tracing::warn!(
-                    "userinfo fetch failed; continuing with placeholder account: {e}"
-                );
-                AccountInfo {
-                    id: AccountId(format!("unknown-{:?}", source)),
-                    email: String::new(),
-                    display_name: None,
-                }
-            }
+        // The userinfo endpoint is only needed for the two-account conflict
+        // chooser (handled in the conflict branch above) and cosmetic display
+        // in Settings.  It consistently returns 404 for Claude Code-origin
+        // tokens, so we skip it here and use a placeholder instead.
+        // If the Settings panel ever needs real account info, it can fetch it
+        // on demand via a separate command.
+        let acc = AccountInfo {
+            id: AccountId(format!("unknown-{:?}", source)),
+            email: String::new(),
+            display_name: None,
         };
         Ok((tok.access_token, source, acc))
     }

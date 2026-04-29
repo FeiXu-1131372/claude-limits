@@ -29,6 +29,9 @@ export function App() {
   // from expanded (solid opaque background).
   useEffect(() => {
     document.body.dataset.viewMode = viewMode;
+    if (navigator.userAgent.includes('Windows')) {
+      document.documentElement.style.setProperty('--window-radius', '18px');
+    }
     return () => { delete document.body.dataset.viewMode; };
   }, [viewMode]);
 

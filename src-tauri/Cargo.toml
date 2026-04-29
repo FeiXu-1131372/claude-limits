@@ -52,6 +52,7 @@ png = "0.17"
 specta = "=2.0.0-rc.22"
 specta-typescript = "=0.0.9"
 tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
+tauri-plugin-positioner = { version = "2.0.0-beta.12", features = ["tray-icon"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 
