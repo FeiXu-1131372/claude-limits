@@ -187,7 +187,7 @@ pub fn run() {
             if let Some(tray) = app.tray_by_id("main") {
                 tracing::info!("attaching menu + handlers to config-created tray");
                 let _ = tray.set_menu(Some(menu));
-                let _ = tray.set_menu_on_left_click(false);
+                let _ = tray.set_show_menu_on_left_click(false);
                 tray.on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(w) = app.get_webview_window("popover") {
