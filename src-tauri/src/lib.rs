@@ -52,11 +52,7 @@ pub fn run() {
         })
         .unwrap_or_default();
 
-    let auth = Arc::new(auth::AuthOrchestrator::new(
-        data_dir.clone(),
-        persisted_settings.preferred_auth_source,
-        http_client,
-    ));
+    let auth = Arc::new(auth::AuthOrchestrator::new(data_dir.clone(), http_client));
 
     let accounts = Arc::new(crate::auth::accounts::AccountManager::new(data_dir.clone()));
 
