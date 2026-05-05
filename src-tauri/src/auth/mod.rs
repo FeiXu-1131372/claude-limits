@@ -6,7 +6,6 @@ pub mod oauth_account_io;
 pub mod oauth_paste_back;
 pub mod orchestrator;
 pub mod paths;
-pub mod token_store;
 
 pub use orchestrator::AuthOrchestrator;
 
