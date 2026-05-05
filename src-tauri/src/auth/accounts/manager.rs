@@ -109,6 +109,42 @@ fn extract_expires_at(cc_blob: &serde_json::Value) -> Option<chrono::DateTime<Ut
 
 pub(crate) fn _used(_: &Path, _: &AccountsLock) {}
 
+/// Pure helper: build the synthetic CC + oauthAccount blobs from a fresh
+/// OAuth token exchange + userinfo response. Public for testing.
+pub fn synthesize_blobs(
+    token: &crate::auth::StoredToken,
+    userinfo: &crate::auth::account_identity::UserInfo,
+) -> (serde_json::Value, serde_json::Value) {
+    let cc = serde_json::json!({
+        "accessToken": token.access_token,
+        "refreshToken": token.refresh_token,
+        "expiresAt": token.expires_at.timestamp_millis(),
+        "scopes": ["user:inference", "user:profile"],
+    });
+    let oa = serde_json::json!({
+        "accountUuid": userinfo.id,
+        "emailAddress": userinfo.email,
+        "organizationUuid": null,
+        "organizationName": null,
+        "displayName": userinfo.name,
+    });
+    (cc, oa)
+}
+
+impl AccountManager {
+    /// Register a new (or refresh existing) managed account from a freshly
+    /// completed paste-back OAuth exchange.
+    pub async fn add_from_oauth(
+        &self,
+        token: crate::auth::StoredToken,
+        userinfo: crate::auth::account_identity::UserInfo,
+    ) -> Result<u32> {
+        let (cc, oa) = synthesize_blobs(&token, &userinfo);
+        let id = identity::from_blobs(&oa, Some(&cc))?;
+        self.upsert(id, cc, oa, AddSource::OAuth)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,5 +200,27 @@ mod tests {
 
         let listed = mgr.list().unwrap();
         assert_eq!(listed.len(), 2);
+    }
+
+    #[test]
+    fn synthesize_blobs_from_token_and_userinfo() {
+        use chrono::Duration;
+        let now = Utc::now();
+        let token = crate::auth::StoredToken {
+            access_token: "at-x".to_string(),
+            refresh_token: Some("rt-x".to_string()),
+            expires_at: now + Duration::hours(8),
+        };
+        let userinfo = crate::auth::account_identity::UserInfo {
+            id: "uuid-x".to_string(),
+            email: "x@x.com".to_string(),
+            name: Some("X".to_string()),
+        };
+        let (cc, oa) = super::synthesize_blobs(&token, &userinfo);
+        assert_eq!(cc["accessToken"], "at-x");
+        assert_eq!(cc["refreshToken"], "rt-x");
+        assert_eq!(cc["expiresAt"].as_i64().unwrap() / 1000, token.expires_at.timestamp());
+        assert_eq!(oa["accountUuid"], "uuid-x");
+        assert_eq!(oa["emailAddress"], "x@x.com");
     }
 }
