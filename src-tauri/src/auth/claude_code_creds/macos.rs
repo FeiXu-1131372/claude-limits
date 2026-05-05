@@ -117,6 +117,99 @@ pub async fn has_creds() -> bool {
     .unwrap_or(false)
 }
 
+/// Read the full `claudeAiOauth` JSON value (preserving every field) for the
+/// canonical service. Falls back to enumeration only when canonical is absent.
+pub async fn load_full_blob() -> Result<Option<serde_json::Value>> {
+    // Try canonical service first — this is what claude-code itself reads.
+    if let Some(blob) = read_one_blob(SERVICE_PREFIX.to_string()).await? {
+        return Ok(Some(blob));
+    }
+    // Fall back to enumeration for installs with non-canonical service names.
+    let services = discover_services().await?;
+    for svc in services {
+        if svc == SERVICE_PREFIX {
+            continue;
+        }
+        if let Some(blob) = read_one_blob(svc).await? {
+            return Ok(Some(blob));
+        }
+    }
+    Ok(None)
+}
+
+async fn read_one_blob(service: String) -> Result<Option<serde_json::Value>> {
+    let out = tokio::task::spawn_blocking(move || {
+        Command::new("security")
+            .args(["find-generic-password", "-s", &service, "-w"])
+            .output()
+    })
+    .await
+    .map_err(io::Error::other)?
+    .context("spawn security find-generic-password")?;
+
+    if !out.status.success() {
+        return Ok(None);
+    }
+
+    let mut bytes = out.stdout;
+    if let Some(&last) = bytes.last() {
+        if last == b'\n' {
+            bytes.pop();
+        }
+    }
+    if !bytes.is_empty() && bytes[0] > 0x7F {
+        bytes.remove(0);
+    }
+
+    let text = String::from_utf8(bytes).context("keychain payload not utf-8")?;
+    let parsed: serde_json::Value = match serde_json::from_str(&text) {
+        Ok(v) => v,
+        Err(_) => return Ok(None),
+    };
+    Ok(parsed.get("claudeAiOauth").cloned())
+}
+
+/// Write the full `claudeAiOauth` blob to the canonical Keychain service.
+/// Always writes to `"Claude Code-credentials"` (no per-account variant) and
+/// passes the blob via stdin so it never appears in the process command-line.
+pub async fn write_full_blob(blob: &serde_json::Value) -> Result<()> {
+    use std::io::Write;
+    use std::process::Stdio;
+
+    // Wrap into the file-on-disk shape: { "claudeAiOauth": { ... } }
+    let wrapped = serde_json::json!({ "claudeAiOauth": blob });
+    let payload = serde_json::to_string(&wrapped)?;
+    let user = std::env::var("USER").unwrap_or_else(|_| "user".to_string());
+
+    tokio::task::spawn_blocking(move || -> Result<()> {
+        let mut child = Command::new("security")
+            .args([
+                "add-generic-password", "-U",
+                "-s", SERVICE_PREFIX,
+                "-a", &user,
+                "-w", "-",
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
+            .context("spawn security add-generic-password")?;
+
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin.write_all(payload.as_bytes()).context("write payload to stdin")?;
+        }
+        let out = child.wait_with_output().context("wait for security")?;
+        if !out.status.success() {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            anyhow::bail!("security add-generic-password failed: {stderr}");
+        }
+        Ok(())
+    })
+    .await
+    .map_err(io::Error::other)??;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -136,5 +229,15 @@ mod tests {
             .single()
             .unwrap();
         assert!(expected > Utc::now() - Duration::days(365 * 100));
+    }
+
+    #[test]
+    fn parse_full_blob_preserves_unknown_fields() {
+        let sample = r#"{"claudeAiOauth":{"accessToken":"a","refreshToken":"r","expiresAt":1840000000000,"scopes":["user:inference"],"subscriptionType":"max","rateLimitTier":"default_claude_max_5x"}}"#;
+        let raw: serde_json::Value = serde_json::from_str(sample).unwrap();
+        let blob = raw.get("claudeAiOauth").unwrap();
+        assert_eq!(blob["subscriptionType"], "max");
+        assert_eq!(blob["rateLimitTier"], "default_claude_max_5x");
+        assert_eq!(blob["scopes"][0], "user:inference");
     }
 }
