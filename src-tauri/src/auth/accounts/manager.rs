@@ -190,6 +190,58 @@ impl AccountManager {
     }
 }
 
+impl AccountManager {
+    /// Refresh an inactive slot's token via the OAuth endpoint, persist the
+    /// new token (rotating refresh token included) back into accounts.json
+    /// under the file lock. **Caller must guarantee `slot` is not the
+    /// currently-active CC account** — refreshing the active slot would race
+    /// against CC's own refresh and one side would get `invalid_grant`.
+    pub async fn refresh_inactive(
+        &self,
+        slot: u32,
+        exchange: &crate::auth::exchange::TokenExchange,
+    ) -> Result<()> {
+        let lock = store::acquire_lock(&self.data_dir)?;
+        let mut store = store::load(&self.data_dir)?;
+        let acc = store
+            .accounts
+            .get_mut(&slot)
+            .ok_or_else(|| anyhow!("slot {slot} not found"))?;
+
+        let refresh_token = acc
+            .claude_code_oauth_blob
+            .get("refreshToken")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("slot {slot} has no refresh token"))?
+            .to_string();
+
+        let new_token = exchange.refresh(&refresh_token).await?;
+
+        let blob = acc
+            .claude_code_oauth_blob
+            .as_object_mut()
+            .ok_or_else(|| anyhow!("blob is not an object"))?;
+        blob.insert(
+            "accessToken".to_string(),
+            serde_json::Value::String(new_token.access_token.clone()),
+        );
+        if let Some(rt) = new_token.refresh_token.as_ref() {
+            blob.insert(
+                "refreshToken".to_string(),
+                serde_json::Value::String(rt.clone()),
+            );
+        }
+        blob.insert(
+            "expiresAt".to_string(),
+            serde_json::json!(new_token.expires_at.timestamp_millis()),
+        );
+        acc.token_expires_at = new_token.expires_at;
+
+        store::save(&self.data_dir, &store, &lock)?;
+        Ok(())
+    }
+}
+
 /// Pure helper: build the synthetic CC + oauthAccount blobs from a fresh
 /// OAuth token exchange + userinfo response. Public for testing.
 pub fn synthesize_blobs(
@@ -289,6 +341,41 @@ mod tests {
 
         let listed = mgr.list().unwrap();
         assert_eq!(listed.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn refresh_inactive_persists_new_token() {
+        use chrono::Duration;
+        let server = mockito::Server::new_async().await;
+        let mock_url = server.url();
+
+        let dir = tempdir().unwrap();
+        let mgr = AccountManager::new(dir.path().to_path_buf());
+
+        let now = Utc::now();
+        let id = identity::from_blobs(&oa_slice("u1", "a@x"), Some(&cc_blob("u1", 1))).unwrap();
+        let mut blob = cc_blob("u1", (now - Duration::hours(1)).timestamp_millis());
+        blob["refreshToken"] = serde_json::Value::String("OLD_RT".to_string());
+        mgr.upsert(id, blob, oa_slice("u1", "a@x"), AddSource::OAuth)
+            .unwrap();
+
+        let mut server = server;
+        let _m = server
+            .mock("POST", "/")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"{"access_token":"NEW_AT","refresh_token":"NEW_RT","expires_in":3600,"token_type":"Bearer"}"#,
+            )
+            .create_async()
+            .await;
+
+        let exchange = crate::auth::exchange::TokenExchange::with_endpoint(mock_url);
+        mgr.refresh_inactive(1, &exchange).await.unwrap();
+
+        let acc = mgr.get(1).unwrap().unwrap();
+        assert_eq!(acc.claude_code_oauth_blob["accessToken"], "NEW_AT");
+        assert_eq!(acc.claude_code_oauth_blob["refreshToken"], "NEW_RT");
     }
 
     #[test]
