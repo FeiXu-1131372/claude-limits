@@ -7,7 +7,6 @@ import { IconButton } from '../components/ui/IconButton';
 import { fadeIn } from '../lib/motion';
 import { IconAuth, IconRefresh, ExternalLink, X } from '../lib/icons';
 import { ipc } from '../lib/ipc';
-import { useAppStore } from '../lib/store';
 import { handleDragStart, closeWindow } from '../lib/window-chrome';
 
 type Step = 'choose' | 'waiting' | 'paste' | 'submitting';
@@ -22,7 +21,6 @@ function toMessage(e: unknown, fallback: string): string {
 }
 
 export function AuthPanel() {
-  const hasClaudeCodeCreds = useAppStore((s) => s.hasClaudeCodeCreds);
   const [step, setStep] = useState<Step>('choose');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -65,9 +63,9 @@ export function AuthPanel() {
   async function useLocal() {
     setError(null);
     try {
-      await ipc.useClaudeCodeCreds();
+      await ipc.addAccountFromClaudeCode();
     } catch (e) {
-      setError(toMessage(e, 'Failed to use Claude Code credentials.'));
+      setError(toMessage(e, "Couldn't import the upstream login."));
     }
   }
 
@@ -129,27 +127,25 @@ export function AuthPanel() {
               </button>
             </Card>
 
-            {hasClaudeCodeCreds && (
-              <Card hover className="p-[var(--space-md)]">
-                <button
-                  type="button"
-                  onClick={useLocal}
-                  className="w-full flex items-center gap-[var(--space-sm)] text-left"
-                >
-                  <div className="w-[32px] h-[32px] rounded-[var(--radius-sm)] bg-[var(--color-track)] flex items-center justify-center shrink-0">
-                    <IconAuth size={14} className="text-[color:var(--color-text-secondary)]" />
-                  </div>
-                  <div className="flex flex-col gap-[2px] flex-1">
-                    <span className="text-[length:var(--text-body)] font-[var(--weight-medium)] text-[color:var(--color-text)]">
-                      Use Claude Code credentials
-                    </span>
-                    <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
-                      Reads from your existing session
-                    </span>
-                  </div>
-                </button>
-              </Card>
-            )}
+            <Card hover className="p-[var(--space-md)]">
+              <button
+                type="button"
+                onClick={useLocal}
+                className="w-full flex items-center gap-[var(--space-sm)] text-left"
+              >
+                <div className="w-[32px] h-[32px] rounded-[var(--radius-sm)] bg-[var(--color-track)] flex items-center justify-center shrink-0">
+                  <IconAuth size={14} className="text-[color:var(--color-text-secondary)]" />
+                </div>
+                <div className="flex flex-col gap-[2px] flex-1">
+                  <span className="text-[length:var(--text-body)] font-[var(--weight-medium)] text-[color:var(--color-text)]">
+                    Use upstream's current login
+                  </span>
+                  <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
+                    Imports the account you're signed into in the CLI
+                  </span>
+                </div>
+              </button>
+            </Card>
           </div>
         )}
 
