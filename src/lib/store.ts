@@ -3,77 +3,133 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { ipc } from './ipc';
 import { subscribe, type AppEvent } from './events';
-import type { CachedUsage, Settings } from './types';
+import type { AccountListEntry, CachedUsage, Settings, SwapReport } from './generated/bindings';
 
-// Module-level unlistener registry. Lives outside the store to avoid
-// serialization and to survive HMR / React strict-mode double-invocations.
 let _unlisteners: UnlistenFn[] = [];
+
+interface AccountAuthState {
+  failingSlots: Set<number>;
+  dismissedUnmanaged: Set<string>;
+}
 
 interface AppStore {
   usage: CachedUsage | null;
   settings: Settings | null;
-  hasClaudeCodeCreds: boolean;
-  authRequired: boolean;
-  conflict: { oauth_email: string; cli_email: string } | null;
+  accounts: AccountListEntry[];
+  activeSlot: number | null;
+  unmanagedActive: { email: string; account_uuid: string } | null;
+  authState: AccountAuthState;
+  requiresSetup: boolean;
   stale: boolean;
   dbReset: boolean;
-  // Bumped whenever the backend ingests new JSONL sessions. Tabs that derive
-  // their data from session history can subscribe to this so they auto-refresh
-  // as Claude Code writes new turns; without it, the report shows the snapshot
-  // from when the tab first mounted and only updates on manual reload.
   sessionDataVersion: number;
-  /** Current view mode — compact popover or expanded report, same window. */
   viewMode: 'compact' | 'expanded';
+  pendingSwapReport: SwapReport | null;
 
   init: () => Promise<void>;
   cleanup: () => void;
   refreshSettings: () => Promise<void>;
   setSettings: (s: Settings) => Promise<void>;
   refreshUsage: () => Promise<void>;
-  signOut: () => Promise<void>;
-  dismissBanner: (kind: 'authRequired' | 'stale' | 'dbReset' | 'conflict') => void;
+  refreshAccounts: () => Promise<void>;
+  dismissBanner: (
+    kind: 'requiresSetup' | 'stale' | 'dbReset' | 'unmanagedActive',
+  ) => void;
   toggleViewMode: () => void;
+  consumeSwapReport: () => void;
 }
 
 export const useAppStore = create<AppStore>((set, _get) => ({
   usage: null,
   settings: null,
-  hasClaudeCodeCreds: false,
-  authRequired: false,
-  conflict: null,
+  accounts: [],
+  activeSlot: null,
+  unmanagedActive: null,
+  authState: { failingSlots: new Set(), dismissedUnmanaged: new Set() },
+  requiresSetup: false,
   stale: false,
   dbReset: false,
   sessionDataVersion: 0,
   viewMode: 'compact',
+  pendingSwapReport: null,
 
   async init() {
-    // Tear down any listeners from a previous init() call (React strict-mode
-    // double-invocation, HMR) so handlers don't accumulate.
     if (_unlisteners.length > 0) {
       _unlisteners.forEach((fn) => fn());
       _unlisteners = [];
     }
 
-    const [usage, settings, hasClaudeCodeCreds] = await Promise.all([
+    const [usage, settings, accounts] = await Promise.all([
       ipc.getCurrentUsage(),
       ipc.getSettings(),
-      ipc.hasClaudeCodeCreds().catch(() => false),
+      ipc.listAccounts().catch(() => []),
     ]);
-    set({ usage, settings, hasClaudeCodeCreds });
+    const active = accounts.find((a) => a.is_active)?.slot ?? null;
+    set({ usage, settings, accounts, activeSlot: active });
 
     _unlisteners = await subscribe((e: AppEvent) => {
       switch (e.type) {
-        case 'usage_updated':
-          set({ usage: e.payload, authRequired: false, stale: e.payload.last_error != null });
+        case 'usage_updated': {
+          const { slot, cached } = e.payload;
+          set((s) => {
+            const next = s.accounts.map((a) =>
+              a.slot === slot
+                ? { ...a, cached_usage: cached, last_error: cached.last_error }
+                : a,
+            );
+            const isActive = s.activeSlot === slot;
+            return {
+              accounts: next,
+              usage: isActive ? cached : s.usage,
+              stale: isActive ? cached.last_error != null : s.stale,
+            };
+          });
+          break;
+        }
+        case 'accounts_changed':
+          set({
+            accounts: e.payload,
+            activeSlot: e.payload.find((a) => a.is_active)?.slot ?? null,
+          });
+          break;
+        case 'auth_required_for_slot':
+          set((s) => {
+            const failing = new Set(s.authState.failingSlots);
+            failing.add(e.payload.slot);
+            return {
+              authState: { ...s.authState, failingSlots: failing },
+            };
+          });
+          break;
+        case 'unmanaged_active_account':
+          set((s) =>
+            s.authState.dismissedUnmanaged.has(e.payload.account_uuid)
+              ? {}
+              : { unmanagedActive: e.payload },
+          );
+          break;
+        case 'requires_setup':
+          set({ requiresSetup: true });
+          break;
+        case 'migrated_accounts':
+          ipc.listAccounts().then((accounts) => {
+            set({
+              accounts,
+              activeSlot: accounts.find((a) => a.is_active)?.slot ?? null,
+            });
+          });
+          break;
+        case 'swap_completed':
+          set({ pendingSwapReport: e.payload });
+          ipc.listAccounts().then((accounts) => {
+            set({
+              accounts,
+              activeSlot: accounts.find((a) => a.is_active)?.slot ?? null,
+            });
+          });
           break;
         case 'session_ingested':
           set((s) => ({ sessionDataVersion: s.sessionDataVersion + 1 }));
-          break;
-        case 'auth_required':
-          set({ authRequired: true });
-          break;
-        case 'auth_source_conflict':
-          set({ conflict: e.payload });
           break;
         case 'stale_data':
           set({ stale: true });
@@ -82,8 +138,6 @@ export const useAppStore = create<AppStore>((set, _get) => ({
           set({ dbReset: true });
           break;
         case 'watcher_error':
-          // JSONL watcher failed to start — logged here; UI can surface a
-          // banner in a future pass when dedicated watcher-error state is added.
           console.error('[watcher_error]', e.payload);
           break;
         case 'popover_hidden':
@@ -91,8 +145,6 @@ export const useAppStore = create<AppStore>((set, _get) => ({
           ipc.resizeWindow('compact').catch(() => {});
           break;
         case 'popover_shown':
-          // Drive the appear animation: globals.css watches
-          // body[data-appearing="true"] and runs a one-shot keyframe.
           document.body.dataset.appearing = 'true';
           window.setTimeout(() => {
             delete document.body.dataset.appearing;
@@ -101,11 +153,6 @@ export const useAppStore = create<AppStore>((set, _get) => ({
       }
     });
 
-    // Re-pull cached usage whenever the popover gains focus. Tauri can suspend
-    // a hidden webview's JS, so usage_updated events fired between hide/show
-    // never reach the store. Without this the popover would happily display
-    // stale numbers while the tray title (updated directly from Rust) shows
-    // the truth.
     try {
       const win = getCurrentWindow();
       const focusUnlisten = await win.onFocusChanged(({ payload: focused }) => {
@@ -116,7 +163,7 @@ export const useAppStore = create<AppStore>((set, _get) => ({
       });
       _unlisteners.push(focusUnlisten);
     } catch {
-      // Outside Tauri (e.g. localhost demo page) — no focus tracking.
+      // Outside Tauri.
     }
   },
 
@@ -140,19 +187,18 @@ export const useAppStore = create<AppStore>((set, _get) => ({
     if (u) set({ usage: u, stale: false });
   },
 
-  async signOut() {
-    await ipc.signOut();
-    // Rust clears credentials and cached_usage but doesn't push an
-    // auth_required event for explicit sign-out. Update the store so
-    // App.tsx routes to AuthPanel and the user can pick an auth method.
-    const hasClaudeCodeCreds = await ipc.hasClaudeCodeCreds().catch(() => false);
-    set({ usage: null, authRequired: true, conflict: null, hasClaudeCodeCreds });
+  async refreshAccounts() {
+    const accounts = await ipc.listAccounts();
+    set({
+      accounts,
+      activeSlot: accounts.find((a) => a.is_active)?.slot ?? null,
+    });
   },
 
   dismissBanner(kind) {
     switch (kind) {
-      case 'authRequired':
-        set({ authRequired: false });
+      case 'requiresSetup':
+        set({ requiresSetup: false });
         break;
       case 'stale':
         set({ stale: false });
@@ -160,8 +206,16 @@ export const useAppStore = create<AppStore>((set, _get) => ({
       case 'dbReset':
         set({ dbReset: false });
         break;
-      case 'conflict':
-        set({ conflict: null });
+      case 'unmanagedActive':
+        set((s) => {
+          if (!s.unmanagedActive) return {};
+          const dismissed = new Set(s.authState.dismissedUnmanaged);
+          dismissed.add(s.unmanagedActive.account_uuid);
+          return {
+            unmanagedActive: null,
+            authState: { ...s.authState, dismissedUnmanaged: dismissed },
+          };
+        });
         break;
     }
   },
@@ -170,5 +224,9 @@ export const useAppStore = create<AppStore>((set, _get) => ({
     const next = _get().viewMode === 'compact' ? 'expanded' : 'compact';
     set({ viewMode: next });
     ipc.resizeWindow(next).catch(() => {});
+  },
+
+  consumeSwapReport() {
+    set({ pendingSwapReport: null });
   },
 }));

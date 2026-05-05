@@ -69,33 +69,9 @@ async startOauthFlow() : Promise<Result<string, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async submitOauthCode(pasted: string) : Promise<Result<null, string>> {
+async submitOauthCode(pasted: string) : Promise<Result<number, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("submit_oauth_code", { pasted }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async useClaudeCodeCreds() : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("use_claude_code_creds") };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async pickAuthSource(source: AuthSource) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("pick_auth_source", { source }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async signOut() : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("sign_out") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -157,6 +133,54 @@ async installUpdate() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async listAccounts() : Promise<Result<AccountListEntry[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_accounts") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async addAccountFromClaudeCode() : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_account_from_claude_code") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async removeAccount(slot: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remove_account", { slot }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async swapToAccount(slot: number) : Promise<Result<SwapReport, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("swap_to_account", { slot }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async detectRunningClaudeCode() : Promise<Result<RunningClaudeCode, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("detect_running_claude_code") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async refreshAccount(slot: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("refresh_account", { slot }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async debugForceThreshold(bucket: string, pct: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("debug_force_threshold", { bucket, pct }) };
@@ -177,6 +201,8 @@ async debugForceThreshold(bucket: string, pct: number) : Promise<Result<null, st
 
 /** user-defined types **/
 
+export type AccountListEntry = { slot: number; email: string; org_name: string | null; org_uuid: string | null; subscription_type: string | null; source: AddSource; is_active: boolean; cached_usage: CachedUsage | null; last_error: string | null }
+export type AddSource = "OAuth" | "ClaudeCode"
 export type AuthSource = "OAuth" | "ClaudeCode"
 /**
  * Linear projection of where 5h utilization will land at the current
@@ -185,13 +211,13 @@ export type AuthSource = "OAuth" | "ClaudeCode"
  * concrete number instead of just the bare current %. None when we don't
  * yet have enough samples (need at least 2 polls ≥ 2 minutes apart).
  */
-export type BurnRateProjection = { 
+export type BurnRateProjection = {
 /**
  * Slope of five_hour.utilization, in percentage points per minute.
  * Positive means consumption is rising; negative is rare but possible
  * if Anthropic adjusts the metric mid-window.
  */
-utilization_per_min: number; 
+utilization_per_min: number;
 /**
  * Projected utilization at five_hour.resets_at if the current pace
  * continues. Not clamped — values >100 are meaningful (means you'd
@@ -203,7 +229,7 @@ export type CachedUsage = { snapshot: UsageSnapshot; account_id: string; account
 export type DailyBucket = { date: string; input_tokens: number; output_tokens: number; cost_usd: number }
 export type ExtraUsage = { is_enabled: boolean; monthly_limit_cents?: number; used_credits_cents?: number; utilization?: number; resets_at: string | null }
 export type ModelStats = { model: string; input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_creation_tokens: number; cost_usd: number }
-export type PricingEntry = { prefix: string; input_per_mtok: number; output_per_mtok: number; cache_read_per_mtok: number; cache_5m_per_mtok: number; cache_1h_per_mtok: number; 
+export type PricingEntry = { prefix: string; input_per_mtok: number; output_per_mtok: number; cache_read_per_mtok: number; cache_5m_per_mtok: number; cache_1h_per_mtok: number;
 /**
  * Optional 1M-context tier (Sonnet 4 only at time of writing). When
  * the per-call input-side context exceeds `above_tokens`, every rate
@@ -212,14 +238,16 @@ export type PricingEntry = { prefix: string; input_per_mtok: number; output_per_
 tier?: PricingTier | null }
 export type PricingTier = { above_tokens: number; input_per_mtok: number; output_per_mtok: number; cache_read_per_mtok: number; cache_5m_per_mtok: number; cache_1h_per_mtok: number }
 export type ProjectStats = { project: string; session_count: number; total_cost_usd: number }
+export type RunningClaudeCode = { cli_processes: number; vscode_with_extension: string[] }
 export type Settings = { polling_interval_secs: number; thresholds: number[]; theme: string; launch_at_login: boolean; crash_reports: boolean; preferred_auth_source: AuthSource | null }
-export type StoredSessionEvent = { ts: string; project: string; model: string; input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_creation_5m_tokens: number; cache_creation_1h_tokens: number; cost_usd: number; source_file: string; source_line: number; 
+export type StoredSessionEvent = { ts: string; project: string; model: string; input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_creation_5m_tokens: number; cache_creation_1h_tokens: number; cost_usd: number; source_file: string; source_line: number;
 /**
  * Stable per-API-call key used for dedup. Format: "{requestId}:{message.id}"
  * when both are present in the JSONL line, else "{source_file}:{source_line}"
  * as a structural fallback for older / pre-requestId schemas.
  */
 event_id: string }
+export type SwapReport = { new_active_slot: number; running: RunningClaudeCode }
 export type UsageSnapshot = { five_hour: Utilization | null; seven_day: Utilization | null; seven_day_sonnet: Utilization | null; seven_day_opus: Utilization | null; extra_usage: ExtraUsage | null; fetched_at?: string }
 export type Utilization = { utilization: number; resets_at: string }
 

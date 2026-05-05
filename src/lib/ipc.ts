@@ -1,7 +1,6 @@
 import { commands, type Result } from './generated/bindings';
-import type { AuthSource, Settings } from './types';
+import type { Settings } from './types';
 
-/** Unwrap a specta-generated Result, throwing on error. */
 async function unwrap<T>(r: Result<T, string>): Promise<T> {
   if (r.status === 'error') throw new Error(r.error);
   return r.data;
@@ -18,10 +17,14 @@ export const ipc = {
 
   startOauthFlow: () => commands.startOauthFlow().then(unwrap),
   submitOauthCode: (pasted: string) => commands.submitOauthCode(pasted).then(unwrap),
-  useClaudeCodeCreds: () => commands.useClaudeCodeCreds().then(unwrap),
-  pickAuthSource: (source: AuthSource) => commands.pickAuthSource(source).then(unwrap),
-  signOut: () => commands.signOut().then(unwrap),
   hasClaudeCodeCreds: () => commands.hasClaudeCodeCreds().then(unwrap),
+
+  listAccounts: () => commands.listAccounts().then(unwrap),
+  addAccountFromClaudeCode: () => commands.addAccountFromClaudeCode().then(unwrap),
+  removeAccount: (slot: number) => commands.removeAccount(slot).then(unwrap),
+  swapToAccount: (slot: number) => commands.swapToAccount(slot).then(unwrap),
+  detectRunningClaudeCode: () => commands.detectRunningClaudeCode().then(unwrap),
+  refreshAccount: (slot: number) => commands.refreshAccount(slot).then(unwrap),
 
   getSettings: () => commands.getSettings().then(unwrap),
   updateSettings: (s: Settings) => commands.updateSettings(s).then(unwrap),
