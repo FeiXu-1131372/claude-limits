@@ -3,6 +3,7 @@ pub mod claude_code_creds;
 pub mod exchange;
 pub mod oauth_paste_back;
 pub mod orchestrator;
+pub mod paths;
 pub mod token_store;
 
 pub use orchestrator::{AccountInfo, AuthError, AuthOrchestrator, AuthResult};
