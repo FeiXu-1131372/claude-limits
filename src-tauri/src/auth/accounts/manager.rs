@@ -1,0 +1,168 @@
+//! `AccountManager` — public surface for add/remove/swap/refresh operations.
+//! Each mutating method acquires the file lock for the duration of its work.
+
+use super::{
+    identity::{self, AccountIdentity},
+    store::{self, AccountsLock, AddSource, ManagedAccount},
+};
+use crate::auth::{oauth_account_io, paths};
+use anyhow::{anyhow, Context, Result};
+use chrono::{TimeZone, Utc};
+use std::path::{Path, PathBuf};
+
+pub struct AccountManager {
+    pub data_dir: PathBuf,
+}
+
+impl AccountManager {
+    pub fn new(data_dir: PathBuf) -> Self {
+        Self { data_dir }
+    }
+
+    pub fn list(&self) -> Result<Vec<ManagedAccount>> {
+        let store = store::load(&self.data_dir)?;
+        Ok(store.accounts.into_values().collect())
+    }
+
+    pub fn get(&self, slot: u32) -> Result<Option<ManagedAccount>> {
+        Ok(store::load(&self.data_dir)?.accounts.remove(&slot))
+    }
+
+    /// Capture the live upstream-CLI credentials and register as a managed
+    /// account. If an account with the same `accountUuid` already exists,
+    /// refresh its stored blobs in place and return that slot.
+    pub async fn add_from_claude_code(&self) -> Result<u32> {
+        let cc_blob = crate::auth::claude_code_creds::load_full_blob()
+            .await
+            .context("read upstream credentials")?
+            .ok_or_else(|| anyhow!("no upstream credentials present"))?;
+
+        let global = paths::claude_global_config()
+            .ok_or_else(|| anyhow!("could not resolve upstream global config path"))?;
+        let oauth_account = oauth_account_io::read_oauth_account(&global)
+            .context("read upstream oauthAccount slice")?
+            .ok_or_else(|| anyhow!("upstream global config missing oauthAccount"))?;
+
+        let id = identity::from_blobs(&oauth_account, Some(&cc_blob))?;
+        self.upsert(id, cc_blob, oauth_account, AddSource::ImportedFromClaudeCode)
+    }
+
+    pub(crate) fn upsert(
+        &self,
+        id: AccountIdentity,
+        cc_blob: serde_json::Value,
+        oauth_account_blob: serde_json::Value,
+        source: AddSource,
+    ) -> Result<u32> {
+        let lock = store::acquire_lock(&self.data_dir)?;
+        let mut store = store::load(&self.data_dir)?;
+
+        let now = Utc::now();
+        let token_expires_at = extract_expires_at(&cc_blob).unwrap_or(now);
+
+        if let Some(existing) = store.find_by_account_uuid(&id.account_uuid).cloned() {
+            let slot = existing.slot;
+            let updated = ManagedAccount {
+                slot,
+                email: id.email,
+                account_uuid: id.account_uuid,
+                organization_uuid: id.organization_uuid,
+                organization_name: id.organization_name,
+                subscription_type: id.subscription_type.or(existing.subscription_type),
+                source,
+                claude_code_oauth_blob: cc_blob,
+                oauth_account_blob,
+                token_expires_at,
+                added_at: existing.added_at,
+                last_seen_active: existing.last_seen_active,
+            };
+            store.accounts.insert(slot, updated);
+            store::save(&self.data_dir, &store, &lock)?;
+            return Ok(slot);
+        }
+
+        let slot = store.next_slot();
+        let acc = ManagedAccount {
+            slot,
+            email: id.email,
+            account_uuid: id.account_uuid,
+            organization_uuid: id.organization_uuid,
+            organization_name: id.organization_name,
+            subscription_type: id.subscription_type,
+            source,
+            claude_code_oauth_blob: cc_blob,
+            oauth_account_blob,
+            token_expires_at,
+            added_at: now,
+            last_seen_active: None,
+        };
+        store.accounts.insert(slot, acc);
+        store::save(&self.data_dir, &store, &lock)?;
+        Ok(slot)
+    }
+}
+
+fn extract_expires_at(cc_blob: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {
+    let ms = cc_blob.get("expiresAt")?.as_i64()?;
+    Utc.timestamp_millis_opt(ms).single()
+}
+
+pub(crate) fn _used(_: &Path, _: &AccountsLock) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn cc_blob(uuid: &str, exp_ms: i64) -> serde_json::Value {
+        serde_json::json!({
+            "accessToken": format!("at-{uuid}"),
+            "refreshToken": format!("rt-{uuid}"),
+            "expiresAt": exp_ms,
+            "scopes": ["user:inference"],
+            "subscriptionType": "max"
+        })
+    }
+
+    fn oa_slice(uuid: &str, email: &str) -> serde_json::Value {
+        serde_json::json!({
+            "accountUuid": uuid,
+            "emailAddress": email,
+            "organizationUuid": null,
+            "organizationName": null
+        })
+    }
+
+    #[test]
+    fn upsert_assigns_first_slot_then_dedups() {
+        let dir = tempdir().unwrap();
+        let mgr = AccountManager::new(dir.path().to_path_buf());
+
+        let id1 = identity::from_blobs(&oa_slice("u1", "a@x"), Some(&cc_blob("u1", 1))).unwrap();
+        let s1 = mgr
+            .upsert(id1, cc_blob("u1", 1), oa_slice("u1", "a@x"), AddSource::OAuth)
+            .unwrap();
+        assert_eq!(s1, 1);
+
+        let id1_again =
+            identity::from_blobs(&oa_slice("u1", "a@x"), Some(&cc_blob("u1", 99))).unwrap();
+        let s1_again = mgr
+            .upsert(
+                id1_again,
+                cc_blob("u1", 99),
+                oa_slice("u1", "a@x"),
+                AddSource::OAuth,
+            )
+            .unwrap();
+        assert_eq!(s1_again, 1, "same accountUuid → same slot");
+
+        let id2 = identity::from_blobs(&oa_slice("u2", "b@x"), Some(&cc_blob("u2", 1))).unwrap();
+        let s2 = mgr
+            .upsert(id2, cc_blob("u2", 1), oa_slice("u2", "b@x"), AddSource::OAuth)
+            .unwrap();
+        assert_eq!(s2, 2);
+
+        let listed = mgr.list().unwrap();
+        assert_eq!(listed.len(), 2);
+    }
+}
