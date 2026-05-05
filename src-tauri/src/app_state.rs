@@ -1,3 +1,4 @@
+use crate::auth::accounts::AccountManager;
 use crate::auth::{AuthOrchestrator, AuthSource};
 use crate::jsonl_parser::PricingTable;
 use crate::store::Db;
@@ -5,7 +6,9 @@ use crate::usage_api::{UsageClient, UsageSnapshot};
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration as StdDuration;
 use tokio::sync::Notify;
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -76,12 +79,21 @@ pub struct AppState {
     pub settings: RwLock<Settings>,
     pub cached_usage: RwLock<Option<CachedUsage>>,
     pub fallback_dir: std::path::PathBuf,
-    // Wakes the poll loop early when the user requests an immediate refresh.
     pub force_refresh: Notify,
+    pub accounts: Arc<AccountManager>,
+    pub cached_usage_by_slot: RwLock<HashMap<u32, CachedUsage>>,
+    pub active_slot: RwLock<Option<u32>>,
+    pub backoff_by_slot: RwLock<HashMap<u32, StdDuration>>,
 }
 
 impl AppState {
     pub fn snapshot(&self) -> Option<CachedUsage> {
+        let active = *self.active_slot.read();
+        if let Some(slot) = active {
+            if let Some(c) = self.cached_usage_by_slot.read().get(&slot) {
+                return Some(c.clone());
+            }
+        }
         self.cached_usage.read().clone()
     }
 }

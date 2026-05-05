@@ -57,6 +57,8 @@ pub fn run() {
         http_client,
     ));
 
+    let accounts = Arc::new(crate::auth::accounts::AccountManager::new(data_dir.clone()));
+
     let app_state = Arc::new(AppState {
         db: db.clone(),
         auth,
@@ -66,6 +68,10 @@ pub fn run() {
         cached_usage: parking_lot::RwLock::new(None),
         fallback_dir: data_dir.clone(),
         force_refresh: tokio::sync::Notify::new(),
+        accounts,
+        cached_usage_by_slot: parking_lot::RwLock::new(std::collections::HashMap::new()),
+        active_slot: parking_lot::RwLock::new(None),
+        backoff_by_slot: parking_lot::RwLock::new(std::collections::HashMap::new()),
     });
 
     // tauri-specta's Builder::commands replaces previously registered commands rather
@@ -206,12 +212,11 @@ pub fn run() {
                 );
             }
             #[cfg(target_os = "windows")]
-            if let Some(popover) = app.get_webview_window("popover") {
-                use window_vibrancy::{apply_acrylic, apply_mica};
-                // Try Mica first (Windows 11), fall back to acrylic (Windows 10).
-                if apply_mica(&popover, Some(true)).is_err() {
-                    let _ = apply_acrylic(&popover, Some((24, 22, 20, 200)));
-                }
+            if let Some(_popover) = app.get_webview_window("popover") {
+                // We do not apply mica/acrylic on Windows because it fills the entire
+                // sharp rectangular bounds of the frameless window, causing white/gray
+                // corners to be visible outside our CSS `border-radius`. The CSS fallback
+                // (oklch 0.86 alpha) looks better than having sharp artifact corners.
             }
 
             // Tray icon — configure the one Tauri auto-created from the
