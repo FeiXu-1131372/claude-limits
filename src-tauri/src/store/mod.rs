@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use fs2::FileExt;
 use rusqlite::Connection;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -27,7 +28,7 @@ impl Db {
         let lock_path = dir.join("claude-monitor.lock");
         let lock_file = File::create(&lock_path).context("create lockfile")?;
         lock_file
-            .try_lock()
+            .try_lock_exclusive()
             .context("another instance holds the DB lock")?;
 
         let db_path = dir.join("data.db");
@@ -81,13 +82,13 @@ impl Db {
     }
 
     /// Create a brand-new SQLite database with the current schema and stamp
-    /// schema_version=2 so that migrate() skips steps meant for v1 upgrades.
+    /// schema_version=3 so that migrate() skips steps meant for older upgrades.
     fn create_fresh_db(db_path: &Path) -> Result<Connection> {
         let conn = Connection::open(db_path).context("open sqlite")?;
         conn.execute_batch(include_str!("schema.sql")).context("apply schema")?;
         conn.execute(
             "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-            [2_i64],
+            [3_i64],
         )
         .context("stamp schema version")?;
         Ok(conn)
@@ -108,9 +109,17 @@ impl Db {
                 .context("apply migration 0002")?;
         }
 
+        if current < 3 {
+            tracing::info!("migrating notification_state v2 -> v3 (drop placeholder account_ids)");
+            conn.execute_batch(include_str!(
+                "migrations/0003_truncate_notification_placeholders.sql"
+            ))
+            .context("apply migration 0003")?;
+        }
+
         conn.execute(
             "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-            [2_i64],
+            [3_i64],
         )?;
         Ok(())
     }
