@@ -132,6 +132,14 @@ pub fn synthesize_blobs(
 }
 
 impl AccountManager {
+    pub fn remove(&self, slot: u32) -> Result<()> {
+        let lock = store::acquire_lock(&self.data_dir)?;
+        let mut store = store::load(&self.data_dir)?;
+        store.accounts.remove(&slot);
+        store::save(&self.data_dir, &store, &lock)?;
+        Ok(())
+    }
+
     /// Register a new (or refresh existing) managed account from a freshly
     /// completed paste-back OAuth exchange.
     pub async fn add_from_oauth(
@@ -200,6 +208,20 @@ mod tests {
 
         let listed = mgr.list().unwrap();
         assert_eq!(listed.len(), 2);
+    }
+
+    #[test]
+    fn remove_is_idempotent_and_lock_protected() {
+        let dir = tempdir().unwrap();
+        let mgr = AccountManager::new(dir.path().to_path_buf());
+
+        let id = identity::from_blobs(&oa_slice("u1", "a@x"), Some(&cc_blob("u1", 1))).unwrap();
+        mgr.upsert(id, cc_blob("u1", 1), oa_slice("u1", "a@x"), AddSource::OAuth)
+            .unwrap();
+
+        mgr.remove(1).unwrap();
+        assert!(mgr.list().unwrap().is_empty());
+        mgr.remove(1).unwrap();
     }
 
     #[test]
