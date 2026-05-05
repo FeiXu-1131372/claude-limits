@@ -14,7 +14,7 @@ function humanize(ms: number): string {
  * in mono. Splitting the family at the word/number boundary is the design's
  * core typographic rule: numbers are JetBrains Mono, copy is system sans.
  */
-export function ResetCountdown({ resetsAt }: { resetsAt: string }) {
+export function ResetCountdown({ resetsAt, compact: _compact }: { resetsAt: string; compact?: boolean }) {
   const [now, setNow] = useState(() => Date.now());
   const target = new Date(resetsAt).getTime();
   useEffect(() => {

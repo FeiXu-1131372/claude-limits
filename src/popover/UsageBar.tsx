@@ -16,6 +16,8 @@ interface UsageBarProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'>
   showLabel?: boolean;
   /** Raw timer string override */
   timer?: string;
+  /** No-op layout hint for embedded contexts. */
+  compact?: boolean;
 }
 
 const heightMap = { sm: 'h-[var(--bar-height-sm)]', md: 'h-[var(--bar-height-md)]' };
