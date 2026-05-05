@@ -1,6 +1,7 @@
 pub mod account_identity;
 pub mod claude_code_creds;
 pub mod exchange;
+pub mod oauth_account_io;
 pub mod oauth_paste_back;
 pub mod orchestrator;
 pub mod paths;
