@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { CompactPopover } from './popover/CompactPopover';
 import { ExpandedReport } from './report/ExpandedReport';
 import { AuthPanel } from './settings/AuthPanel';
-import { AuthConflictChooser } from './settings/AuthConflictChooser';
 import { useAppStore } from './lib/store';
 import { attachUpdateListeners } from './lib/updateEvents';
 import './styles/globals.css';
@@ -11,8 +10,8 @@ import './styles/tokens.css';
 
 export function App() {
   const init = useAppStore((s) => s.init);
-  const authRequired = useAppStore((s) => s.authRequired);
-  const conflict = useAppStore((s) => s.conflict);
+  const requiresSetup = useAppStore((s) => s.requiresSetup);
+  const accounts = useAppStore((s) => s.accounts);
   const viewMode = useAppStore((s) => s.viewMode);
   const [initialized, setInitialized] = useState(false);
 
@@ -26,8 +25,6 @@ export function App() {
     return () => { teardown?.(); };
   }, []);
 
-  // Tag the body so CSS can differentiate compact (transparent vibrancy)
-  // from expanded (solid opaque background).
   useEffect(() => {
     document.body.dataset.viewMode = viewMode;
     if (navigator.userAgent.includes('Windows')) {
@@ -44,22 +41,10 @@ export function App() {
     );
   }
 
-  if (conflict) {
-    return <AuthConflictChooser />;
-  }
-
-  // Only redirect to AuthPanel on an explicit auth-required signal from the
-  // backend. A null `usage` just means the first poll hasn't landed yet —
-  // CompactPopover handles that with a Loading state. Conflating "loading"
-  // with "auth needed" caused every cold start to flash the sign-in screen.
-  if (authRequired) {
+  if (requiresSetup && accounts.length === 0) {
     return <AuthPanel />;
   }
 
-  // Cross-fade between the two view modes. mode="wait" so the outgoing
-  // view fully fades before the incoming one starts — matches the Rust-
-  // side window resize that runs in parallel (~280ms total) and avoids
-  // both renders fighting for the same canvas during the transition.
   return (
     <AnimatePresence mode="wait" initial={false}>
       {viewMode === 'expanded' ? (
