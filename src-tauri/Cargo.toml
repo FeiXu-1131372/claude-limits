@@ -41,6 +41,7 @@ rand = "0.9"
 zeroize = { version = "1", features = ["zeroize_derive"] }
 anyhow = "1"
 fs2 = "0.4"
+futures = "0.3"
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
@@ -62,6 +63,7 @@ tauri-plugin-positioner = { version = "2.0.0-beta.12", features = ["tray-icon"] 
 windows-sys = { version = "0.59", features = ["Win32_Security_Authorization", "Win32_Foundation"] }
 
 [dev-dependencies]
+futures = "0.3"
 tempfile = "3"
 mockito = "1"
 pretty_assertions = "1"

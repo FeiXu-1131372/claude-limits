@@ -109,6 +109,87 @@ fn extract_expires_at(cc_blob: &serde_json::Value) -> Option<chrono::DateTime<Ut
 
 pub(crate) fn _used(_: &Path, _: &AccountsLock) {}
 
+#[derive(Debug, thiserror::Error)]
+pub enum SwapError {
+    #[error("slot {0} not found")]
+    NotFound(u32),
+    #[error("incomplete account: {0}")]
+    IncompleteAccount(String),
+    #[error("credential write failed: {0}")]
+    CredentialWriteFailed(String),
+    #[error("config write failed: {0}; credentials restored")]
+    ConfigWriteFailed(String),
+    #[error("config write failed AND restore failed: {0}; CC may need re-login")]
+    Critical(String),
+    #[error("infrastructure error: {0}")]
+    Other(#[from] anyhow::Error),
+}
+
+impl AccountManager {
+    /// Atomic two-step swap with rollback:
+    ///   a. Snapshot live CC credentials + ~/.claude.json oauthAccount slice.
+    ///   b. Write target.claude_code_oauth_blob to CC's primary store.
+    ///   c. Splice target.oauth_account_blob into ~/.claude.json.
+    ///
+    /// On step-b failure: nothing has been mutated; return error.
+    /// On step-c failure: try to restore step-b. If restore also fails:
+    /// return Critical so the UI can surface a hard-error banner.
+    pub async fn swap_to(&self, slot: u32) -> Result<(), SwapError> {
+        let target = self
+            .get(slot)?
+            .ok_or(SwapError::NotFound(slot))?;
+
+        if !target.claude_code_oauth_blob.is_object() {
+            return Err(SwapError::IncompleteAccount(
+                "claude_code_oauth_blob is not an object".into(),
+            ));
+        }
+        if !target.oauth_account_blob.is_object() {
+            return Err(SwapError::IncompleteAccount(
+                "oauth_account_blob is not an object".into(),
+            ));
+        }
+
+        // Step a: snapshot.
+        let prev_cc = crate::auth::claude_code_creds::load_full_blob()
+            .await
+            .map_err(|e| SwapError::Other(anyhow!("snapshot CC creds: {e}")))?;
+
+        let global = paths::claude_global_config()
+            .ok_or_else(|| SwapError::Other(anyhow!("resolve global config path")))?;
+        let prev_oauth_account = oauth_account_io::read_oauth_account(&global)
+            .map_err(|e| SwapError::Other(anyhow!("snapshot oauthAccount: {e}")))?;
+
+        // Step b: write CC creds.
+        if let Err(e) =
+            crate::auth::claude_code_creds::write_full_blob(&target.claude_code_oauth_blob).await
+        {
+            return Err(SwapError::CredentialWriteFailed(e.to_string()));
+        }
+
+        // Step c: write global config.
+        if let Err(e) = oauth_account_io::write_oauth_account(&global, &target.oauth_account_blob)
+        {
+            // Roll back step b.
+            let restore_result = match prev_cc {
+                Some(blob) => crate::auth::claude_code_creds::write_full_blob(&blob).await,
+                None => Ok(()),
+            };
+            if let Some(prev) = prev_oauth_account {
+                let _ = oauth_account_io::write_oauth_account(&global, &prev);
+            }
+            return match restore_result {
+                Ok(_) => Err(SwapError::ConfigWriteFailed(e.to_string())),
+                Err(restore_err) => Err(SwapError::Critical(format!(
+                    "{e}; restore failed: {restore_err}"
+                ))),
+            };
+        }
+
+        Ok(())
+    }
+}
+
 /// Pure helper: build the synthetic CC + oauthAccount blobs from a fresh
 /// OAuth token exchange + userinfo response. Public for testing.
 pub fn synthesize_blobs(
@@ -208,6 +289,18 @@ mod tests {
 
         let listed = mgr.list().unwrap();
         assert_eq!(listed.len(), 2);
+    }
+
+    #[test]
+    fn swap_rollback_restores_credentials_when_config_write_fails() {
+        if std::env::var_os("USER").is_none() && std::env::var_os("USERPROFILE").is_none() {
+            eprintln!("skipping swap rollback test: no USER/USERPROFILE");
+            return;
+        }
+        let dir = tempdir().unwrap();
+        let mgr = AccountManager::new(dir.path().to_path_buf());
+        let r = futures::executor::block_on(mgr.swap_to(99));
+        assert!(r.is_err(), "swap to nonexistent slot must error");
     }
 
     #[test]
