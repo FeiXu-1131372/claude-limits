@@ -5,6 +5,7 @@ pub mod jsonl_parser;
 mod logging;
 pub mod notifier;
 mod poll_loop;
+mod process_detection;
 pub mod store;
 mod tray;
 mod tray_icon;
