@@ -1,4 +1,5 @@
 pub mod account_identity;
+pub mod accounts;
 pub mod claude_code_creds;
 pub mod exchange;
 pub mod oauth_account_io;

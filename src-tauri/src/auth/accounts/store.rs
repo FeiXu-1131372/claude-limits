@@ -1,0 +1,231 @@
+//! On-disk store for managed accounts. Single JSON file at
+//! `<app-data-dir>/accounts.json`, protected by a sibling `.accounts.lock`
+//! file. Atomic write: temp + rename.
+
+use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
+use fs2::FileExt;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::fs::{File, OpenOptions};
+use std::path::{Path, PathBuf};
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, specta::Type)]
+pub enum AddSource {
+    OAuth,
+    ImportedFromClaudeCode,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct ManagedAccount {
+    pub slot: u32,
+    pub email: String,
+    pub account_uuid: String,
+    pub organization_uuid: Option<String>,
+    pub organization_name: Option<String>,
+    pub subscription_type: Option<String>,
+    pub source: AddSource,
+    pub claude_code_oauth_blob: serde_json::Value,
+    pub oauth_account_blob: serde_json::Value,
+    pub token_expires_at: DateTime<Utc>,
+    pub added_at: DateTime<Utc>,
+    pub last_seen_active: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AccountsStore {
+    pub schema_version: u32,
+    pub accounts: BTreeMap<u32, ManagedAccount>,
+}
+
+impl AccountsStore {
+    pub const CURRENT_SCHEMA_VERSION: u32 = 1;
+
+    pub fn next_slot(&self) -> u32 {
+        self.accounts.keys().max().copied().unwrap_or(0) + 1
+    }
+
+    pub fn find_by_account_uuid(&self, uuid: &str) -> Option<&ManagedAccount> {
+        self.accounts.values().find(|a| a.account_uuid == uuid)
+    }
+}
+
+fn store_path(dir: &Path) -> PathBuf {
+    dir.join("accounts.json")
+}
+
+fn lock_path(dir: &Path) -> PathBuf {
+    dir.join(".accounts.lock")
+}
+
+fn corrupt_path(dir: &Path) -> PathBuf {
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    dir.join(format!("accounts.json.corrupt-{ts}"))
+}
+
+pub struct AccountsLock {
+    _file: File,
+}
+
+pub fn acquire_lock(dir: &Path) -> Result<AccountsLock> {
+    std::fs::create_dir_all(dir).context("create accounts dir")?;
+    let f = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(false)
+        .open(lock_path(dir))
+        .context("open .accounts.lock")?;
+    f.try_lock_exclusive()
+        .context("another instance holds .accounts.lock")?;
+    Ok(AccountsLock { _file: f })
+}
+
+pub fn load(dir: &Path) -> Result<AccountsStore> {
+    let p = store_path(dir);
+    if !p.exists() {
+        return Ok(AccountsStore {
+            schema_version: AccountsStore::CURRENT_SCHEMA_VERSION,
+            accounts: BTreeMap::new(),
+        });
+    }
+    let text = std::fs::read_to_string(&p).context("read accounts.json")?;
+    match serde_json::from_str::<AccountsStore>(&text) {
+        Ok(store) => Ok(store),
+        Err(e) => {
+            tracing::warn!(
+                "accounts.json corrupt ({e}); backing up and starting fresh"
+            );
+            let backup = corrupt_path(dir);
+            let _ = std::fs::rename(&p, &backup);
+            Ok(AccountsStore {
+                schema_version: AccountsStore::CURRENT_SCHEMA_VERSION,
+                accounts: BTreeMap::new(),
+            })
+        }
+    }
+}
+
+pub fn save(dir: &Path, store: &AccountsStore, _lock: &AccountsLock) -> Result<()> {
+    std::fs::create_dir_all(dir).context("create accounts dir")?;
+    let p = store_path(dir);
+    let tmp = dir.join("accounts.json.tmp");
+    let payload = serde_json::to_string_pretty(store)?;
+    std::fs::write(&tmp, &payload).context("write temp accounts.json")?;
+    restrict_permissions(&tmp)?;
+    std::fs::rename(&tmp, &p).context("rename temp accounts.json into place")?;
+    Ok(())
+}
+
+#[cfg(unix)]
+fn restrict_permissions(p: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let mut perms = std::fs::metadata(p)?.permissions();
+    perms.set_mode(0o600);
+    std::fs::set_permissions(p, perms)?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn restrict_permissions(_p: &Path) -> Result<()> {
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn sample_account(slot: u32, uuid: &str) -> ManagedAccount {
+        ManagedAccount {
+            slot,
+            email: format!("user{slot}@x.com"),
+            account_uuid: uuid.to_string(),
+            organization_uuid: None,
+            organization_name: None,
+            subscription_type: Some("max".to_string()),
+            source: AddSource::ImportedFromClaudeCode,
+            claude_code_oauth_blob: serde_json::json!({
+                "accessToken": "a",
+                "refreshToken": "r",
+                "expiresAt": 1840000000000_i64,
+                "scopes": ["user:inference"],
+                "subscriptionType": "max"
+            }),
+            oauth_account_blob: serde_json::json!({
+                "accountUuid": uuid,
+                "emailAddress": format!("user{slot}@x.com"),
+                "organizationUuid": null,
+                "organizationName": null
+            }),
+            token_expires_at: Utc::now(),
+            added_at: Utc::now(),
+            last_seen_active: None,
+        }
+    }
+
+    #[test]
+    fn round_trip_multiple_accounts_preserves_unknown_fields() {
+        let dir = tempdir().unwrap();
+        let lock = acquire_lock(dir.path()).unwrap();
+        let mut store = AccountsStore {
+            schema_version: 1,
+            accounts: BTreeMap::new(),
+        };
+        let mut a = sample_account(1, "uuid-a");
+        a.claude_code_oauth_blob["futureField"] =
+            serde_json::Value::String("preserved".to_string());
+        store.accounts.insert(1, a);
+        store.accounts.insert(2, sample_account(2, "uuid-b"));
+
+        save(dir.path(), &store, &lock).unwrap();
+        drop(lock);
+
+        let loaded = load(dir.path()).unwrap();
+        assert_eq!(loaded.accounts.len(), 2);
+        assert_eq!(
+            loaded.accounts[&1].claude_code_oauth_blob["futureField"],
+            "preserved"
+        );
+        assert_eq!(loaded.find_by_account_uuid("uuid-b").unwrap().slot, 2);
+    }
+
+    #[test]
+    fn corrupt_file_backs_up_and_returns_empty() {
+        let dir = tempdir().unwrap();
+        std::fs::write(dir.path().join("accounts.json"), "not json{").unwrap();
+        let loaded = load(dir.path()).unwrap();
+        assert_eq!(loaded.accounts.len(), 0);
+        let entries: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().into_string().unwrap_or_default())
+            .collect();
+        assert!(
+            entries.iter().any(|n| n.starts_with("accounts.json.corrupt-")),
+            "expected backup file; got {entries:?}"
+        );
+    }
+
+    #[test]
+    fn next_slot_starts_at_one_and_increments() {
+        let mut store = AccountsStore {
+            schema_version: 1,
+            accounts: BTreeMap::new(),
+        };
+        assert_eq!(store.next_slot(), 1);
+        store.accounts.insert(1, sample_account(1, "u1"));
+        store.accounts.insert(3, sample_account(3, "u3"));
+        assert_eq!(store.next_slot(), 4);
+    }
+
+    #[test]
+    fn double_lock_is_rejected() {
+        let dir = tempdir().unwrap();
+        let _first = acquire_lock(dir.path()).unwrap();
+        let second = acquire_lock(dir.path());
+        assert!(second.is_err());
+    }
+}

@@ -40,6 +40,7 @@ sha2 = "0.10"
 rand = "0.9"
 zeroize = { version = "1", features = ["zeroize_derive"] }
 anyhow = "1"
+fs2 = "0.4"
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
@@ -50,7 +51,7 @@ parking_lot = "0.12"
 tiny-skia = "0.11"
 ttf-parser = "0.21"
 png = "0.17"
-specta = "=2.0.0-rc.22"
+specta = { version = "=2.0.0-rc.22", features = ["chrono", "serde_json"] }
 specta-typescript = "=0.0.9"
 tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
 tauri-plugin-positioner = { version = "2.0.0-beta.12", features = ["tray-icon"] }
