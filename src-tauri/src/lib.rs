@@ -89,9 +89,6 @@ pub fn run() {
             commands::get_cache_stats,
             commands::start_oauth_flow,
             commands::submit_oauth_code,
-            commands::use_claude_code_creds,
-            commands::pick_auth_source,
-            commands::sign_out,
             commands::has_claude_code_creds,
             commands::update_settings,
             commands::get_settings,
@@ -99,6 +96,12 @@ pub fn run() {
             commands::force_refresh,
             commands::check_for_updates_now,
             commands::install_update,
+            commands::list_accounts,
+            commands::add_account_from_claude_code,
+            commands::remove_account,
+            commands::swap_to_account,
+            commands::detect_running_claude_code,
+            commands::refresh_account,
         ]);
 
     #[cfg(debug_assertions)]
@@ -113,9 +116,6 @@ pub fn run() {
             commands::get_cache_stats,
             commands::start_oauth_flow,
             commands::submit_oauth_code,
-            commands::use_claude_code_creds,
-            commands::pick_auth_source,
-            commands::sign_out,
             commands::has_claude_code_creds,
             commands::update_settings,
             commands::get_settings,
@@ -123,6 +123,12 @@ pub fn run() {
             commands::force_refresh,
             commands::check_for_updates_now,
             commands::install_update,
+            commands::list_accounts,
+            commands::add_account_from_claude_code,
+            commands::remove_account,
+            commands::swap_to_account,
+            commands::detect_running_claude_code,
+            commands::refresh_account,
             commands::debug_force_threshold,
         ]);
 

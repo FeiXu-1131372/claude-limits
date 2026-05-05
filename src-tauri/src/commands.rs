@@ -1,5 +1,6 @@
 use crate::app_state::{AppState, CachedUsage, Settings};
-use crate::auth::AuthSource;
+use crate::auth::accounts::{AddSource, ManagedAccount};
+use crate::process_detection::{self, RunningClaudeCode};
 use crate::store::StoredSessionEvent;
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
@@ -196,9 +197,8 @@ pub async fn start_oauth_flow(state: State<'_, Arc<AppState>>) -> Result<String,
 pub async fn submit_oauth_code(
     pasted: String,
     state: State<'_, Arc<AppState>>,
-) -> Result<(), String> {
+) -> Result<u32, String> {
     use crate::auth::oauth_paste_back::parse_pasted_code;
-    use crate::auth::token_store;
 
     const PKCE_TTL: std::time::Duration = std::time::Duration::from_secs(600);
 
@@ -206,69 +206,36 @@ pub async fn submit_oauth_code(
     let pkce = match entry {
         None => return Err("No active sign-in — click 'Sign in with Claude' first".to_string()),
         Some((_pair, started_at)) if started_at.elapsed() > PKCE_TTL => {
-            // Expired — drop the pair immediately to clear the secret from memory,
-            // then return an error so the user re-initiates the flow.
             drop(state.auth.pending_oauth.write().take());
-            return Err("Sign-in session expired (10-minute limit). Click 'Sign in with Claude' to start again.".to_string());
+            return Err(
+                "Sign-in session expired (10-minute limit). Click 'Sign in' to start again."
+                    .to_string(),
+            );
         }
         Some((pair, _)) => pair,
     };
 
     let code = parse_pasted_code(&pasted, &pkce.state).map_err(err_to_string)?;
-    let token = state.auth.exchange
+    let token = state
+        .auth
+        .exchange
         .exchange_code(&code, &pkce.verifier)
         .await
         .map_err(err_to_string)?;
-    token_store::save(&token, &state.fallback_dir).await.map_err(err_to_string)?;
-
+    let userinfo = state
+        .auth
+        .identity
+        .fetch(&token.access_token)
+        .await
+        .map_err(err_to_string)?;
+    let slot = state
+        .accounts
+        .add_from_oauth(token, userinfo)
+        .await
+        .map_err(err_to_string)?;
     *state.auth.pending_oauth.write() = None;
-    state.auth.set_preferred_source(AuthSource::OAuth).await;
-    let mut settings = state.settings.read().clone();
-    settings.preferred_auth_source = Some(AuthSource::OAuth);
-    state.db.save_settings(&settings).map_err(err_to_string)?;
-    *state.settings.write() = settings;
-    Ok(())
-}
-
-#[command]
-#[specta::specta]
-pub async fn use_claude_code_creds(state: State<'_, Arc<AppState>>) -> Result<(), String> {
-    state.auth.set_preferred_source(AuthSource::ClaudeCode).await;
-    Ok(())
-}
-
-#[command]
-#[specta::specta]
-pub async fn pick_auth_source(
-    source: AuthSource,
-    state: State<'_, Arc<AppState>>,
-) -> Result<(), String> {
-    state.auth.set_preferred_source(source).await;
-    let mut settings = state.settings.read().clone();
-    settings.preferred_auth_source = Some(source);
-    state.db.save_settings(&settings).map_err(err_to_string)?;
-    *state.settings.write() = settings;
-    Ok(())
-}
-
-#[command]
-#[specta::specta]
-pub async fn sign_out(
-    app: tauri::AppHandle,
-    state: State<'_, Arc<AppState>>,
-) -> Result<(), String> {
-    use crate::auth::token_store;
-    use crate::tray;
-    token_store::clear(&state.fallback_dir).map_err(err_to_string)?;
-    *state.cached_usage.write() = None;
-    *state.auth.pending_oauth.write() = None;
-    crate::poll_loop::reset_stale_flag();
-    tray::set_level(&app, None, None, None, None, true);
-    let mut settings = state.settings.read().clone();
-    settings.preferred_auth_source = None;
-    state.db.save_settings(&settings).map_err(err_to_string)?;
-    *state.settings.write() = settings;
-    Ok(())
+    state.force_refresh.notify_one();
+    Ok(slot)
 }
 
 #[command]
@@ -426,4 +393,124 @@ pub async fn check_for_updates_now(app: tauri::AppHandle) -> Result<(), String> 
 #[specta::specta]
 pub async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
     crate::updater::install_now(&app).await
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct AccountListEntry {
+    pub slot: u32,
+    pub email: String,
+    pub org_name: Option<String>,
+    pub org_uuid: Option<String>,
+    pub subscription_type: Option<String>,
+    pub source: AddSource,
+    pub is_active: bool,
+    pub cached_usage: Option<CachedUsage>,
+    pub last_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct SwapReport {
+    pub new_active_slot: u32,
+    pub running: RunningClaudeCode,
+}
+
+fn entry_for(state: &AppState, acc: &ManagedAccount, active: Option<u32>) -> AccountListEntry {
+    let cache = state.cached_usage_by_slot.read();
+    let cached = cache.get(&acc.slot).cloned();
+    let last_error = cached.as_ref().and_then(|c| c.last_error.clone());
+    AccountListEntry {
+        slot: acc.slot,
+        email: acc.email.clone(),
+        org_name: acc.organization_name.clone(),
+        org_uuid: acc.organization_uuid.clone(),
+        subscription_type: acc.subscription_type.clone(),
+        source: acc.source,
+        is_active: Some(acc.slot) == active,
+        cached_usage: cached,
+        last_error,
+    }
+}
+
+#[command]
+#[specta::specta]
+pub async fn list_accounts(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<AccountListEntry>, String> {
+    let accounts = state.accounts.list().map_err(err_to_string)?;
+    let active = *state.active_slot.read();
+    Ok(accounts
+        .iter()
+        .map(|a| entry_for(&state, a, active))
+        .collect())
+}
+
+#[command]
+#[specta::specta]
+pub async fn add_account_from_claude_code(
+    state: State<'_, Arc<AppState>>,
+) -> Result<u32, String> {
+    let slot = state
+        .accounts
+        .add_from_claude_code()
+        .await
+        .map_err(err_to_string)?;
+    state.force_refresh.notify_one();
+    Ok(slot)
+}
+
+#[command]
+#[specta::specta]
+pub async fn remove_account(
+    slot: u32,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
+    state.accounts.remove(slot).map_err(err_to_string)?;
+    state.cached_usage_by_slot.write().remove(&slot);
+    state.backoff_by_slot.write().remove(&slot);
+    Ok(())
+}
+
+#[command]
+#[specta::specta]
+pub async fn swap_to_account(
+    slot: u32,
+    state: State<'_, Arc<AppState>>,
+) -> Result<SwapReport, String> {
+    state
+        .accounts
+        .swap_to(slot)
+        .await
+        .map_err(|e| e.to_string())?;
+    let running = process_detection::detect();
+    state.force_refresh.notify_one();
+    Ok(SwapReport {
+        new_active_slot: slot,
+        running,
+    })
+}
+
+#[command]
+#[specta::specta]
+pub async fn detect_running_claude_code() -> Result<RunningClaudeCode, String> {
+    Ok(process_detection::detect())
+}
+
+#[command]
+#[specta::specta]
+pub async fn refresh_account(
+    slot: u32,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
+    let active = *state.active_slot.read();
+    if Some(slot) == active {
+        state.force_refresh.notify_one();
+        return Ok(());
+    }
+    state
+        .accounts
+        .refresh_inactive(slot, &state.auth.exchange)
+        .await
+        .map_err(err_to_string)?;
+    state.force_refresh.notify_one();
+    Ok(())
 }
