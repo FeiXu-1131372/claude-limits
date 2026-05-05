@@ -20,7 +20,7 @@ pub fn detect() -> RunningClaudeCode {
 
     let mut cli = 0u32;
     let mut vscode_workspaces = Vec::new();
-    for (_pid, p) in sys.processes() {
+    for p in sys.processes().values() {
         let name = p.name().to_string_lossy().to_lowercase();
         let cmd: Vec<String> = p
             .cmd()

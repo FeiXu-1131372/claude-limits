@@ -13,10 +13,6 @@ use tauri::{AppHandle, Emitter};
 
 static STALE_EMITTED: AtomicBool = AtomicBool::new(false);
 
-pub fn reset_stale_flag() {
-    STALE_EMITTED.store(false, Ordering::SeqCst);
-}
-
 pub fn spawn(handle: AppHandle, state: Arc<AppState>) {
     tauri::async_runtime::spawn(async move {
         let mut burn_buffers: HashMap<u32, VecDeque<(DateTime<Utc>, f64)>> = HashMap::new();
@@ -72,11 +68,9 @@ async fn poll_all(
         .iter()
         .filter(|a| {
             let backoff_map = state.backoff_by_slot.read();
-            backoff_map.get(&a.slot).map_or(true, |_d| {
-                // Treat backoff entries as "skip once" — cleared on successful poll
-                // or natural expiry below.
-                false
-            })
+            // Treat backoff entries as "skip once" — cleared on successful poll
+            // or natural expiry below.
+            backoff_map.get(&a.slot).is_none()
         })
         .map(|a| a.slot)
         .collect();

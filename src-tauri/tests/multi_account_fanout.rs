@@ -26,7 +26,6 @@ async fn three_slots_mixed_outcomes() {
         .create_async()
         .await;
     let _ = server.url();
-    // Successful smoke: the bin links and the test runtime works.
-    assert!(true);
     let _ = lib::store::default_dir();
+    // Smoke: bin links, test runtime works — reaching here without panic is the assertion.
 }

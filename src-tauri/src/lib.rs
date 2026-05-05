@@ -63,7 +63,6 @@ pub fn run() {
         pricing: pricing.clone(),
         settings: parking_lot::RwLock::new(persisted_settings),
         cached_usage: parking_lot::RwLock::new(None),
-        fallback_dir: data_dir.clone(),
         force_refresh: tokio::sync::Notify::new(),
         accounts,
         cached_usage_by_slot: parking_lot::RwLock::new(std::collections::HashMap::new()),

@@ -20,6 +20,5 @@ async fn active_slot_path_never_calls_token_endpoint() {
     // signature and that it returns the live token unmodified.
 
     let _ = lib::auth::accounts::AccountManager::new(std::env::temp_dir());
-    // Compile-time check: the active-vs-inactive branch exists.
-    assert!(true);
+    // Reaching here without panic confirms the constructor and type linkage.
 }

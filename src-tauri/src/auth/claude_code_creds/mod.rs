@@ -19,7 +19,7 @@ pub async fn load_full_blob() -> Result<Option<serde_json::Value>> {
     #[cfg(target_os = "macos")]
     return macos::load_full_blob().await;
     #[cfg(target_os = "windows")]
-    return Ok(windows::load_full_blob()?);
+    return windows::load_full_blob();
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     return Ok(None);
 }

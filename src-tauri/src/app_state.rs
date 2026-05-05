@@ -64,6 +64,7 @@ pub struct CachedUsage {
 }
 
 impl CachedUsage {
+    #[allow(dead_code)]
     pub fn is_stale(&self, now: DateTime<Utc>) -> bool {
         (now - self.snapshot.fetched_at) > chrono::Duration::minutes(15)
             || now < self.snapshot.fetched_at
@@ -78,7 +79,6 @@ pub struct AppState {
     pub pricing: Arc<PricingTable>,
     pub settings: RwLock<Settings>,
     pub cached_usage: RwLock<Option<CachedUsage>>,
-    pub fallback_dir: std::path::PathBuf,
     pub force_refresh: Notify,
     pub accounts: Arc<AccountManager>,
     pub cached_usage_by_slot: RwLock<HashMap<u32, CachedUsage>>,
