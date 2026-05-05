@@ -6,6 +6,8 @@ import { IconButton } from '../components/ui/IconButton';
 import { UpdateBanner } from '../components/UpdateBanner';
 import { UsageSummary } from '../components/UsageSummary';
 import { SettingsPanel } from '../settings/SettingsPanel';
+import { AccountsPanel } from '../accounts/AccountsPanel';
+import { UnmanagedActiveBanner } from '../accounts/UnmanagedActiveBanner';
 import { useAppStore } from '../lib/store';
 import { useUpdateStore } from '../state/updateStore';
 import { ipc } from '../lib/ipc';
@@ -23,17 +25,32 @@ function formatRelativeTime(iso: string): string {
   return `${hours}h ago`;
 }
 
+function SwapToast() {
+  const report = useAppStore((s) => s.pendingSwapReport);
+  const consume = useAppStore((s) => s.consumeSwapReport);
+  useEffect(() => {
+    if (!report) return;
+    const t = window.setTimeout(consume, 4000);
+    return () => window.clearTimeout(t);
+  }, [report, consume]);
+  if (!report) return null;
+  return (
+    <div className="absolute bottom-[40px] left-[var(--popover-pad)] right-[var(--popover-pad)] rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-[var(--space-sm)] py-[var(--space-2xs)] text-[length:var(--text-micro)] text-white">
+      ✓ Switched to slot {report.new_active_slot}.
+    </div>
+  );
+}
+
 export function CompactPopover() {
   const usage = useAppStore((s) => s.usage);
   const thresholds = useAppStore((s) => s.settings?.thresholds ?? [75, 90]);
-  const authRequired = useAppStore((s) => s.authRequired);
   const stale = useAppStore((s) => s.stale);
-  const conflict = useAppStore((s) => s.conflict);
   const dismissBanner = useAppStore((s) => s.dismissBanner);
   const toggleViewMode = useAppStore((s) => s.toggleViewMode);
-  const [view, setView] = useState<'home' | 'settings'>('home');
+  const [view, setView] = useState<'home' | 'settings' | 'accounts'>('home');
   const [refreshing, setRefreshing] = useState(false);
 
+  const accountEmail = usage?.account_email ?? null;
   const fetchedAt = usage?.snapshot.fetched_at;
   const updatedAgo = useMemo(
     () => (fetchedAt ? formatRelativeTime(fetchedAt) : ''),
@@ -61,6 +78,14 @@ export function CompactPopover() {
     );
   }
 
+  if (view === 'accounts') {
+    return (
+      <Shell>
+        <AccountsPanel onBack={() => setView('home')} />
+      </Shell>
+    );
+  }
+
   if (!usage) {
     return <LoadingShell refreshing={refreshing} onRefresh={handleRefresh} onSettings={() => setView('settings')} />;
   }
@@ -75,35 +100,25 @@ export function CompactPopover() {
         live
         stale={stale}
         refreshing={refreshing}
+        accountEmail={accountEmail}
         onRefresh={handleRefresh}
         onSettings={() => setView('settings')}
+        onAccounts={() => setView('accounts')}
         onToggleView={toggleViewMode}
       />
 
-      {/* Banners — quiet, hairline border, dismissible */}
+      {/* Banners */}
       <div className="flex flex-col gap-[6px] px-[var(--popover-pad)]">
-        {authRequired && (
-          <Banner variant="warning" onDismiss={() => dismissBanner('authRequired')}>
-            Sign in to continue monitoring.
-          </Banner>
-        )}
+        <UnmanagedActiveBanner />
         {stale && (
           <Banner variant="stale" onDismiss={() => dismissBanner('stale')}>
             Data may be stale.
-          </Banner>
-        )}
-        {conflict && (
-          <Banner variant="warning">
-            Two accounts detected — choose in Settings.
           </Banner>
         )}
       </div>
 
       <UsageSummary usage={usage} thresholds={[warn, danger]} />
 
-      {/* Footer: timestamp left, version + check-for-updates right. Explicit
-       * inline marginTop: auto because Tailwind's `mt-auto` utility wasn't
-       * being picked up here — this is more robust than depending on JIT. */}
       <div
         style={{ marginTop: 'auto' }}
         className="flex items-center justify-between gap-2 px-[var(--popover-pad)] py-[var(--space-sm)] border-t border-[var(--color-rule)]"
@@ -113,22 +128,13 @@ export function CompactPopover() {
         </span>
         <VersionFooter />
       </div>
+
+      <SwapToast />
     </Shell>
   );
 }
 
 
-/**
- * Shown while `usage` is still null. Self-heals by:
- *   1. Kicking ipc.forceRefresh() the moment it mounts so the Rust poll loop
- *      wakes up and emits usage_updated immediately, instead of waiting for
- *      the next scheduled poll (default 5 min).
- *   2. Polling ipc.getCurrentUsage() every second in case a poll already
- *      succeeded but its event landed before the webview was listening
- *      (Tauri can drop events fired before the listener registers).
- *   3. Showing the user a clear "Tap refresh if this hangs" affordance after
- *      ~3s so they're not staring at a spinner indefinitely.
- */
 function LoadingShell({
   refreshing,
   onRefresh,
@@ -142,16 +148,12 @@ function LoadingShell({
   const [hint, setHint] = useState(false);
 
   useEffect(() => {
-    // Wake the poll loop now.
     ipc.forceRefresh().catch(() => {});
 
-    // Fall back to polling the cached snapshot in case the usage_updated
-    // event was emitted before this webview's listener registered.
     const tick = setInterval(() => {
       refreshUsage().catch(() => {});
     }, 1000);
 
-    // Surface a manual hint if loading drags.
     const hintTimer = setTimeout(() => setHint(true), 3000);
 
     return () => {
@@ -166,8 +168,10 @@ function LoadingShell({
         live={false}
         stale={false}
         refreshing={refreshing}
+        accountEmail={null}
         onRefresh={onRefresh}
         onSettings={onSettings}
+        onAccounts={() => {}}
       />
       <div className="flex flex-1 flex-col items-center justify-center gap-[var(--space-sm)] px-[var(--popover-pad)] text-center">
         <span className="text-[length:var(--text-label)] text-[color:var(--color-text-muted)]">
@@ -194,24 +198,23 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-/**
- * Top chrome strip — also serves as the drag region for the borderless
- * popover window. The whole strip is `data-tauri-drag-region`; buttons inside
- * intercept their own clicks normally.
- */
 function ChromeBar({
   live,
   stale,
   refreshing,
+  accountEmail,
   onRefresh,
   onSettings,
+  onAccounts,
   onToggleView,
 }: {
   live: boolean;
   stale: boolean;
   refreshing: boolean;
+  accountEmail: string | null;
   onRefresh: () => void;
   onSettings: () => void;
+  onAccounts: () => void;
   onToggleView?: () => void;
 }) {
   return (
@@ -219,10 +222,18 @@ function ChromeBar({
       onPointerDown={handleDragStart}
       className="flex items-center justify-between gap-[var(--space-sm)] px-[var(--popover-pad)] pt-[var(--space-md)] pb-[var(--space-sm)] cursor-default select-none"
     >
-      <div className="flex items-center gap-[var(--space-xs)] pointer-events-none">
-        <span className="text-[length:var(--text-label)] font-[var(--weight-semibold)] text-[color:var(--color-text-secondary)] tracking-[var(--tracking-label)] uppercase">
+      <div className="flex items-center gap-[var(--space-xs)]">
+        <span className="text-[length:var(--text-label)] font-[var(--weight-semibold)] text-[color:var(--color-text-secondary)] tracking-[var(--tracking-label)] uppercase pointer-events-none">
           Claude
         </span>
+        <button
+          type="button"
+          onClick={onAccounts}
+          className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)] truncate max-w-[180px]"
+          title={accountEmail ?? ''}
+        >
+          {accountEmail ?? 'Sign in'}
+        </button>
         <StatusDot live={live} stale={stale} />
       </div>
       <div className="flex items-center gap-[2px]">
@@ -285,10 +296,6 @@ function Header({ title, onBack }: { title: string; onBack: () => void }) {
   );
 }
 
-/**
- * Live = accent pulse. Stale = warm dimmed dot, no pulse. Offline = transparent
- * ring. Replaces the previous pill badge — quieter, doesn't compete with data.
- */
 function StatusDot({ live, stale }: { live: boolean; stale: boolean }) {
   if (stale) {
     return (
@@ -321,10 +328,6 @@ function StatusDot({ live, stale }: { live: boolean; stale: boolean }) {
   );
 }
 
-/**
- * Right side of the footer — shows current version and a transient
- * "Check for updates" link that reflects the live update status.
- */
 function VersionFooter() {
   const status = useUpdateStore((s) => s.status);
   const [transient, setTransient] = useState<null | 'checking' | 'up-to-date' | 'failed'>(null);
@@ -378,4 +381,3 @@ function VersionFooter() {
     </span>
   );
 }
-
