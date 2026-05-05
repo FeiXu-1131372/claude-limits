@@ -1,7 +1,9 @@
 pub mod identity;
 pub mod manager;
+pub mod migration;
 pub mod store;
 
 pub use identity::{from_blobs, AccountIdentity};
 pub use manager::AccountManager;
+pub use migration::{migrate_legacy, MigrationReport};
 pub use store::{AccountsLock, AccountsStore, AddSource, ManagedAccount};
