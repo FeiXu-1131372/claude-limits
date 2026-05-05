@@ -35,6 +35,10 @@ impl IdentityFetcher {
         }
     }
 
+    pub fn client_arc(&self) -> Arc<reqwest::Client> {
+        self.client.clone()
+    }
+
     pub async fn fetch(&self, access_token: &str) -> Result<UserInfo> {
         let resp = self
             .client

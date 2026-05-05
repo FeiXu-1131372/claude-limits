@@ -311,6 +311,28 @@ pub fn run() {
                 });
             }
 
+            {
+                let h = handle.clone();
+                let dir = data_dir.clone();
+                let identity_fetcher = state.auth.identity_arc();
+                tauri::async_runtime::spawn(async move {
+                    use tauri::Emitter;
+                    match crate::auth::accounts::migrate_legacy(&dir, identity_fetcher).await {
+                        Ok(report) if !report.imported_slots.is_empty() => {
+                            tracing::info!(
+                                "migrated {} legacy account(s)",
+                                report.imported_slots.len()
+                            );
+                            let _ = h.emit("migrated_accounts", &report.imported_slots);
+                        }
+                        Ok(_) => {}
+                        Err(e) => {
+                            tracing::warn!("legacy migration failed: {e}");
+                        }
+                    }
+                });
+            }
+
             poll_loop::spawn(handle.clone(), state.clone());
             crate::updater::run_scheduler(handle.clone());
 

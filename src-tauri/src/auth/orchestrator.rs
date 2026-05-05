@@ -162,6 +162,12 @@ impl AuthOrchestrator {
         *self.preferred_source.lock().await = Some(src);
     }
 
+    pub fn identity_arc(&self) -> std::sync::Arc<crate::auth::account_identity::IdentityFetcher> {
+        std::sync::Arc::new(crate::auth::account_identity::IdentityFetcher::new(
+            self.identity.client_arc(),
+        ))
+    }
+
     async fn fetch_identity(&self, _source: AuthSource, token: &str) -> anyhow::Result<UserInfo> {
         {
             let cache = self.identity_cache.lock().await;
