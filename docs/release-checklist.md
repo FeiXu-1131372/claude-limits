@@ -27,7 +27,9 @@ Before tagging a release, complete every item on both macOS and Windows.
 - [ ] Add B via "Use upstream's current login" path (after upstream `/login` as B)
 - [ ] Add C via paste-back OAuth (without changing upstream's login)
 - [ ] All three show usage in the Accounts sub-screen with correct numbers
-- [ ] Click row B → swap → verify CC primary store + `~/.claude.json` reflect B; restart upstream and confirm B is active
+- [ ] Click row B → swap → verify CC primary store + `~/.claude.json` reflect B
+- [ ] Hot reload — leave a `claude` CLI session running as A in another terminal; swap to B in tray; within ~30s, send a CC turn and verify it succeeds against B (check `~/.claude/logs` or run `/account` in CC)
+- [ ] Hot reload under in-flight refresh — force the running CC to refresh (e.g., wait until access expiry near or use `--debug` log to confirm refresh-in-flight) and trigger swap mid-refresh; verify final keychain state is B (`security find-generic-password -s "Claude Code-credentials" -w | jq -r .claudeAiOauth.refreshToken | head -c 12`); guardian re-applies within 60s
 - [ ] Repeat with VS Code extension running — toast shows running-process hint, restart extension and confirm B
 - [ ] Run `cswap --switch-to A` externally → tray app's active dot moves to A within one poll interval; no false `unmanaged_active_account` banner
 - [ ] Upstream `/login` as new D externally → `unmanaged_active_account` banner appears; click "Add to accounts" → D appears, banner clears
