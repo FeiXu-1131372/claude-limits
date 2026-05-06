@@ -3,22 +3,27 @@ import { useAppStore } from '../lib/store';
 import { ipc } from '../lib/ipc';
 import { AccountRow } from './AccountRow';
 import { AddAccountChooser } from './AddAccountChooser';
-import { SwapConfirmModal } from './SwapConfirmModal';
+import { SwapConfirmCard } from './SwapConfirmCard';
 import type { AccountListEntry, RunningClaudeCode } from '../lib/generated/bindings';
 
 interface Props {
   onBack: () => void;
 }
 
+interface PendingSwap {
+  target: AccountListEntry;
+  running: RunningClaudeCode;
+}
+
 export function AccountsPanel({ onBack }: Props) {
   const accounts = useAppStore((s) => s.accounts);
   const thresholds = useAppStore((s) => (s.settings?.thresholds ?? [75, 90]) as [number, number]);
   const refreshAccounts = useAppStore((s) => s.refreshAccounts);
+  const setPendingSwapReport = useAppStore((s) => s.setPendingSwapReport);
   const [chooserOpen, setChooserOpen] = useState(false);
-  const [confirm, setConfirm] = useState<
-    { entry: AccountListEntry; running: RunningClaudeCode } | null
-  >(null);
-  const [error, setError] = useState<string | null>(null);
+  const [swappingSlot, setSwappingSlot] = useState<number | null>(null);
+  const [pending, setPending] = useState<PendingSwap | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const orgGroups = useMemo(() => {
     const map = new Map<string, AccountListEntry>();
@@ -30,30 +35,58 @@ export function AccountsPanel({ onBack }: Props) {
     return map;
   }, [accounts]);
 
-  async function tryRowSwap(entry: AccountListEntry) {
-    setError(null);
-    if (entry.is_active) return;
-    const running = await ipc.detectRunningClaudeCode();
-    if (running.cli_processes === 0 && running.vscode_with_extension.length === 0) {
-      await performSwap(entry);
-    } else {
-      setConfirm({ entry, running });
+  const currentActive = useMemo(
+    () => accounts.find((a) => a.is_active) ?? null,
+    [accounts],
+  );
+
+  async function requestSwap(entry: AccountListEntry) {
+    if (entry.is_active || swappingSlot !== null) return;
+    setConfirmError(null);
+    let running: RunningClaudeCode = { cli_processes: 0, vscode_with_extension: [] };
+    try {
+      running = await ipc.detectRunningClaudeCode();
+    } catch {
+      // Detection is best-effort — fall through with empty running state.
     }
+    setPending({ target: entry, running });
   }
 
-  async function performSwap(entry: AccountListEntry) {
+  async function confirmSwap() {
+    if (!pending || swappingSlot !== null) return;
+    setConfirmError(null);
+    setSwappingSlot(pending.target.slot);
     try {
-      await ipc.swapToAccount(entry.slot);
+      const report = await ipc.swapToAccount(pending.target.slot);
+      setPendingSwapReport(report);
       await refreshAccounts();
+      setPending(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Swap failed');
+      setConfirmError(e instanceof Error ? e.message : 'Swap failed');
     } finally {
-      setConfirm(null);
+      setSwappingSlot(null);
     }
   }
 
   if (chooserOpen) {
     return <AddAccountChooser onClose={() => setChooserOpen(false)} />;
+  }
+
+  if (pending) {
+    return (
+      <SwapConfirmCard
+        current={currentActive}
+        target={pending.target}
+        running={pending.running}
+        busy={swappingSlot !== null}
+        errorMessage={confirmError}
+        onConfirm={confirmSwap}
+        onCancel={() => {
+          setPending(null);
+          setConfirmError(null);
+        }}
+      />
+    );
   }
 
   return (
@@ -88,27 +121,12 @@ export function AccountsPanel({ onBack }: Props) {
               entry={a}
               thresholds={thresholds}
               shareHint={shareHint}
-              onClick={() => tryRowSwap(a)}
+              onSwap={() => requestSwap(a)}
+              swapBusy={swappingSlot !== null}
+              swapping={swappingSlot === a.slot}
             />
           );
         })}
-
-        {confirm && (
-          <div className="px-[var(--popover-pad)] py-[var(--space-sm)]">
-            <SwapConfirmModal
-              email={confirm.entry.email}
-              running={confirm.running}
-              onConfirm={() => performSwap(confirm.entry)}
-              onCancel={() => setConfirm(null)}
-            />
-          </div>
-        )}
-
-        {error && (
-          <span className="block px-[var(--popover-pad)] py-[var(--space-sm)] text-[length:var(--text-micro)] text-[color:var(--color-danger)]">
-            {error}
-          </span>
-        )}
 
         <div className="px-[var(--popover-pad)] py-[var(--space-md)]">
           <button
