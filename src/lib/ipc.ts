@@ -15,8 +15,8 @@ export const ipc = {
   getProjectBreakdown: (days: number) => commands.getProjectBreakdown(days).then(unwrap),
   getCacheStats: (days: number) => commands.getCacheStats(days).then(unwrap),
 
-  startOauthFlow: () => commands.startOauthFlow().then(unwrap),
-  submitOauthCode: (pasted: string) => commands.submitOauthCode(pasted).then(unwrap),
+  startOauthFlow: (longLived: boolean = false) =>
+    commands.startOauthFlow(longLived).then(unwrap),
   hasClaudeCodeCreds: () => commands.hasClaudeCodeCreds().then(unwrap),
 
   listAccounts: () => commands.listAccounts().then(unwrap),
