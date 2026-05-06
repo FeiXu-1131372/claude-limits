@@ -6,10 +6,12 @@ async fn successful_code_exchange() {
     let mut server = Server::new_async().await;
     let _m = server
         .mock("POST", "/")
+        .match_header("content-type", "application/x-www-form-urlencoded")
         .match_body(mockito::Matcher::AllOf(vec![
             mockito::Matcher::UrlEncoded("grant_type".into(), "authorization_code".into()),
             mockito::Matcher::UrlEncoded("code".into(), "abc".into()),
             mockito::Matcher::UrlEncoded("code_verifier".into(), "verif".into()),
+            mockito::Matcher::UrlEncoded("state".into(), "st1".into()),
         ]))
         .with_status(200)
         .with_header("content-type", "application/json")
@@ -18,9 +20,42 @@ async fn successful_code_exchange() {
         .await;
 
     let ex = TokenExchange::with_endpoint(server.url());
-    let tok = ex.exchange_code("abc", "verif").await.unwrap();
+    let tok = ex
+        .exchange_code("abc", "verif", "http://localhost:1234/callback", "st1", None)
+        .await
+        .unwrap();
     assert_eq!(tok.access_token, "acc");
     assert_eq!(tok.refresh_token.as_deref(), Some("ref"));
+}
+
+#[tokio::test]
+async fn long_lived_exchange_includes_expires_in() {
+    let mut server = Server::new_async().await;
+    let _m = server
+        .mock("POST", "/")
+        .match_header("content-type", "application/x-www-form-urlencoded")
+        .match_body(mockito::Matcher::AllOf(vec![
+            mockito::Matcher::UrlEncoded("grant_type".into(), "authorization_code".into()),
+            mockito::Matcher::UrlEncoded("expires_in".into(), "31536000".into()),
+        ]))
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(r#"{"access_token":"acc","expires_in":31536000}"#)
+        .create_async()
+        .await;
+
+    let ex = TokenExchange::with_endpoint(server.url());
+    let tok = ex
+        .exchange_code(
+            "abc",
+            "verif",
+            "http://localhost:1234/callback",
+            "st1",
+            Some(365 * 24 * 60 * 60),
+        )
+        .await
+        .unwrap();
+    assert_eq!(tok.access_token, "acc");
 }
 
 #[tokio::test]
@@ -35,7 +70,10 @@ async fn exchange_error_surfaces_status_not_body() {
         .create_async()
         .await;
     let ex = TokenExchange::with_endpoint(server.url());
-    let err = ex.exchange_code("abc", "verif").await.unwrap_err();
+    let err = ex
+        .exchange_code("abc", "verif", "http://localhost:1234/callback", "st1", None)
+        .await
+        .unwrap_err();
     let msg = err.to_string();
     assert!(msg.contains("400"), "error should include HTTP status: {msg}");
     assert!(!msg.contains("bad_code"), "error must not include response body: {msg}");

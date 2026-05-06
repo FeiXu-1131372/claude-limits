@@ -12,6 +12,7 @@ pub struct AuthOrchestrator {
     pub fallback_dir: PathBuf,
     pub exchange: TokenExchange,
     pub identity: IdentityFetcher,
+    #[allow(dead_code)]
     pub pending_oauth: RwLock<Option<(PkcePair, Instant)>>,
 }
 

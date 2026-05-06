@@ -181,61 +181,73 @@ pub async fn get_cache_stats(
 
 #[command]
 #[specta::specta]
-pub async fn start_oauth_flow(state: State<'_, Arc<AppState>>) -> Result<String, String> {
-    use crate::auth::oauth_paste_back::{build_authorize_url, generate_pkce};
-    let pkce = generate_pkce();
-    let url = build_authorize_url(&pkce).map_err(err_to_string)?;
-    // Explicitly drop any existing pair before replacing so secrets don't
-    // linger in memory longer than necessary.
-    let old = state.auth.pending_oauth.write().replace((pkce, std::time::Instant::now()));
-    drop(old);
-    Ok(url)
-}
-
-#[command]
-#[specta::specta]
-pub async fn submit_oauth_code(
-    pasted: String,
+pub async fn start_oauth_flow(
+    long_lived: bool,
     state: State<'_, Arc<AppState>>,
-) -> Result<u32, String> {
-    use crate::auth::oauth_paste_back::parse_pasted_code;
-
-    const PKCE_TTL: std::time::Duration = std::time::Duration::from_secs(600);
-
-    let entry = state.auth.pending_oauth.read().clone();
-    let pkce = match entry {
-        None => return Err("No active sign-in — click 'Sign in with Claude' first".to_string()),
-        Some((_pair, started_at)) if started_at.elapsed() > PKCE_TTL => {
-            drop(state.auth.pending_oauth.write().take());
-            return Err(
-                "Sign-in session expired (10-minute limit). Click 'Sign in' to start again."
-                    .to_string(),
-            );
-        }
-        Some((pair, _)) => pair,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    use crate::auth::oauth_paste_back::{
+        build_authorize_url, generate_pkce, start_local_callback_server,
+        LONG_LIVED_EXPIRES_IN_SECS,
     };
 
-    let code = parse_pasted_code(&pasted, &pkce.state).map_err(err_to_string)?;
-    let token = state
-        .auth
-        .exchange
-        .exchange_code(&code, &pkce.verifier)
-        .await
-        .map_err(err_to_string)?;
-    let userinfo = state
-        .auth
-        .identity
-        .fetch(&token.access_token)
-        .await
-        .map_err(err_to_string)?;
-    let slot = state
-        .accounts
-        .add_from_oauth(token, userinfo)
-        .await
-        .map_err(err_to_string)?;
-    *state.auth.pending_oauth.write() = None;
-    state.force_refresh.notify_one();
-    Ok(slot)
+    let pkce = generate_pkce();
+    let (port, rx) = start_local_callback_server().await.map_err(err_to_string)?;
+    let redirect_uri = format!("http://localhost:{port}/callback");
+    let url = build_authorize_url(&pkce, &redirect_uri, long_lived).map_err(err_to_string)?;
+    let expires_in = if long_lived { Some(LONG_LIVED_EXPIRES_IN_SECS) } else { None };
+
+    let state_clone = Arc::clone(state.inner());
+
+    tokio::spawn(async move {
+        use tauri::Emitter;
+
+        let result: Result<u32, String> = async {
+            let (code, callback_state) = rx
+                .await
+                .map_err(|_| "OAuth server closed before callback arrived".to_string())?
+                .map_err(err_to_string)?;
+
+            if callback_state != pkce.state {
+                return Err("State mismatch — possible replay attack".to_string());
+            }
+
+            let token = state_clone
+                .auth
+                .exchange
+                .exchange_code(&code, &pkce.verifier, &redirect_uri, &pkce.state, expires_in)
+                .await
+                .map_err(err_to_string)?;
+
+            let userinfo = state_clone
+                .auth
+                .identity
+                .fetch(&token.access_token)
+                .await
+                .map_err(err_to_string)?;
+
+            let slot = state_clone
+                .accounts
+                .add_from_oauth(token, userinfo)
+                .await
+                .map_err(err_to_string)?;
+
+            state_clone.force_refresh.notify_one();
+            Ok(slot)
+        }
+        .await;
+
+        match result {
+            Ok(slot) => {
+                let _ = app.emit("oauth_complete", slot);
+            }
+            Err(e) => {
+                let _ = app.emit("oauth_error", e);
+            }
+        }
+    });
+
+    Ok(url)
 }
 
 #[command]

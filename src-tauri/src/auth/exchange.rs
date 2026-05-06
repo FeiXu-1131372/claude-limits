@@ -1,4 +1,4 @@
-use super::oauth_paste_back::{CLIENT_ID, REDIRECT_URI, TOKEN_URL};
+use super::oauth_paste_back::{CLIENT_ID, TOKEN_URL};
 use super::StoredToken;
 use anyhow::{anyhow, Result};
 use chrono::{Duration, Utc};
@@ -35,19 +35,37 @@ impl TokenExchange {
         }
     }
 
-    pub async fn exchange_code(&self, code: &str, pkce_verifier: &str) -> Result<StoredToken, anyhow::Error> {
-        let params = [
+    pub async fn exchange_code(
+        &self,
+        code: &str,
+        pkce_verifier: &str,
+        redirect_uri: &str,
+        state: &str,
+        expires_in: Option<u64>,
+    ) -> Result<StoredToken, anyhow::Error> {
+        // platform.claude.com/v1/oauth/token requires application/x-www-form-urlencoded
+        // (the legacy console.anthropic.com endpoint accepted JSON; the new
+        // platform host returns 400 invalid_grant for JSON bodies). State is
+        // echoed back through the token request — see Claude Code's OAuth
+        // client. `expires_in` requests a long-lived token (only honored for
+        // inference-only scope).
+        let expires_str = expires_in.map(|n| n.to_string());
+        let mut params: Vec<(&str, &str)> = vec![
             ("grant_type", "authorization_code"),
             ("code", code),
-            ("redirect_uri", REDIRECT_URI),
+            ("redirect_uri", redirect_uri),
             ("client_id", CLIENT_ID),
             ("code_verifier", pkce_verifier),
+            ("state", state),
         ];
+        if let Some(s) = expires_str.as_deref() {
+            params.push(("expires_in", s));
+        }
         let resp = self.client.post(&self.endpoint).form(&params).send().await?;
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            tracing::debug!("token exchange error body: {text}");
+            tracing::warn!("token exchange error body: {text}");
             return Err(anyhow!("token exchange failed: {status}"));
         }
         let tr: TokenResponse = resp.json().await?;
@@ -68,7 +86,7 @@ impl TokenExchange {
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            tracing::debug!("token refresh error body: {text}");
+            tracing::warn!("token refresh error body: {text}");
             return Err(anyhow!("refresh failed: {status}"));
         }
         let tr: TokenResponse = resp.json().await?;
