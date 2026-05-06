@@ -27,6 +27,11 @@ function formatRelativeTime(iso: string): string {
 
 function SwapToast() {
   const report = useAppStore((s) => s.pendingSwapReport);
+  const email = useAppStore((s) =>
+    report
+      ? s.accounts.find((a) => a.slot === report.new_active_slot)?.email ?? null
+      : null,
+  );
   const consume = useAppStore((s) => s.consumeSwapReport);
   useEffect(() => {
     if (!report) return;
@@ -34,9 +39,22 @@ function SwapToast() {
     return () => window.clearTimeout(t);
   }, [report, consume]);
   if (!report) return null;
+  const cli = report.running.cli_processes;
+  const code = report.running.vscode_with_extension.length;
+  const hasRunning = cli > 0 || code > 0;
   return (
-    <div className="absolute bottom-[40px] left-[var(--popover-pad)] right-[var(--popover-pad)] rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-[var(--space-sm)] py-[var(--space-2xs)] text-[length:var(--text-micro)] text-white">
-      ✓ Switched to slot {report.new_active_slot}.
+    <div className="absolute bottom-[40px] left-[var(--popover-pad)] right-[var(--popover-pad)] rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-[var(--space-sm)] py-[var(--space-2xs)] text-[length:var(--text-micro)] text-white shadow-[0_4px_14px_rgba(0,0,0,0.18)]">
+      <div className="truncate">
+        ✓ Switched to {email ?? `slot ${report.new_active_slot}`}
+      </div>
+      {hasRunning && (
+        <div className="opacity-85">
+          {cli > 0 && `${cli} CLI session${cli > 1 ? 's' : ''}`}
+          {cli > 0 && code > 0 && ' · '}
+          {code > 0 && `${code} VS Code`}
+          {' adopting in ~30s'}
+        </div>
+      )}
     </div>
   );
 }
@@ -128,8 +146,6 @@ export function CompactPopover() {
         </span>
         <VersionFooter />
       </div>
-
-      <SwapToast />
     </Shell>
   );
 }
@@ -194,6 +210,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       style={{ width: 'var(--popover-width)', height: 'var(--popover-height)' }}
     >
       {children}
+      <SwapToast />
     </div>
   );
 }
