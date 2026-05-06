@@ -1,0 +1,7 @@
+# Work around the MSVC 14.44 (VS 2022 17.14) link.exe crash
+# (STATUS_STACK_BUFFER_OVERRUN / E06D7363) that affects Rust projects.
+# Uses rust-lld (Rust's bundled LLD linker) instead of the broken link.exe.
+# Remove this file once Microsoft ships a fix for Visual Studio.
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld"
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
