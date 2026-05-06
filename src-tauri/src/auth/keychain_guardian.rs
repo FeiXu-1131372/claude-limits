@@ -161,4 +161,27 @@ mod tests {
         );
         g.cancel();
     }
+
+    #[tokio::test(start_paused = true)]
+    async fn stops_writing_after_deadline() {
+        let io = MockIO::new(blob("rt-b"));
+        let _g = KeychainGuardian::arm(blob("rt-b"), io.clone());
+
+        // Drift in at t+5s, well within the guard window.
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        *io.current.lock().unwrap() = Some(blob("rt-a"));
+        tokio::time::sleep(Duration::from_secs(4)).await; // expect re-apply
+        let writes_during_guard = io.writes.load(Ordering::SeqCst);
+        assert!(writes_during_guard >= 1, "should re-apply during guard window");
+
+        // Past deadline (t+9s + 60s + slack), drift in again — must NOT re-apply.
+        tokio::time::sleep(Duration::from_secs(70)).await;
+        *io.current.lock().unwrap() = Some(blob("rt-c"));
+        tokio::time::sleep(Duration::from_secs(10)).await;
+        let writes_after_deadline = io.writes.load(Ordering::SeqCst);
+        assert_eq!(
+            writes_after_deadline, writes_during_guard,
+            "guardian must not write after deadline"
+        );
+    }
 }
