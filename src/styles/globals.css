@@ -61,16 +61,12 @@ body[data-view-mode="compact"] #root {
   /* Round the popover content so it reads as a Control-Center / Raycast-style
    * widget rather than a square panel. Native vibrancy clips to this radius.
    *
-   * We layer a substantially opaque dark base on top of the vibrancy because
-   * pure vibrancy alone (HudWindow material) lets too much wallpaper bleed
-   * through — over a bright/colorful background, muted text simply disappears.
-   * The 0.86 alpha keeps a subtle hint of native blur showing through (so the
-   * widget still reads as glass) while giving text a stable dark canvas to
-   * sit on. The two warm radial washes add a light-source feel on top. */
+   * Fully opaque dark base so text has a stable canvas regardless of wallpaper.
+   * The two warm radial washes add a light-source feel on top. */
   background:
     radial-gradient(120% 80% at 0% 0%, oklch(72% 0.10 55 / 0.08), transparent 55%),
     radial-gradient(120% 80% at 100% 100%, oklch(67% 0.135 38 / 0.05), transparent 55%),
-    oklch(20% 0.012 65 / 0.86);
+    oklch(20% 0.012 65);
 }
 
 body[data-view-mode="expanded"] #root {
