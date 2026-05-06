@@ -88,6 +88,24 @@ async fn run_guardian<I: CredIO>(
     }
 }
 
+pub struct ClaudeCodeCredIO;
+
+#[async_trait]
+impl CredIO for ClaudeCodeCredIO {
+    async fn load(&self) -> Result<Option<Value>> {
+        crate::auth::claude_code_creds::load_full_blob().await
+    }
+    async fn write(&self, blob: &Value) -> Result<()> {
+        crate::auth::claude_code_creds::write_full_blob(blob).await
+    }
+}
+
+impl KeychainGuardian {
+    pub fn arm_with_claude_code_creds(target_blob: Value) -> Self {
+        Self::arm(target_blob, Arc::new(ClaudeCodeCredIO))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
