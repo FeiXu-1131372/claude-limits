@@ -56,6 +56,7 @@ specta = { version = "=2.0.0-rc.22", features = ["chrono", "serde_json"] }
 specta-typescript = "=0.0.9"
 tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
 tauri-plugin-positioner = { version = "2.0.0-beta.12", features = ["tray-icon"] }
+async-trait = "0.1.89"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 
