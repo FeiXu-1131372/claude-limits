@@ -146,8 +146,8 @@ async fn poll_all(
                         handle,
                         snapshot.five_hour.as_ref().map(|u| u.utilization),
                         snapshot.seven_day.as_ref().map(|u| u.utilization),
-                        snapshot.five_hour.as_ref().map(|u| u.resets_at),
-                        snapshot.seven_day.as_ref().map(|u| u.resets_at),
+                        snapshot.five_hour.as_ref().and_then(|u| u.resets_at),
+                        snapshot.seven_day.as_ref().and_then(|u| u.resets_at),
                         false,
                     );
                     let thresholds = state.settings.read().thresholds.clone();
@@ -244,7 +244,7 @@ fn update_burn_rate(
     now: DateTime<Utc>,
 ) -> Option<BurnRateProjection> {
     let five_hour = snapshot.five_hour.as_ref()?;
-    let resets_at = five_hour.resets_at;
+    let resets_at = five_hour.resets_at?;
     let window_start = resets_at - ChronoDuration::hours(5);
     while let Some(&(ts, _)) = buf.front() {
         if ts < window_start {

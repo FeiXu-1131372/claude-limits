@@ -52,12 +52,12 @@ pub struct Fired {
 fn utilization_of(bucket: Bucket, s: &UsageSnapshot) -> (Option<f64>, Option<DateTime<Utc>>) {
     fn of(u: &Option<Utilization>) -> (Option<f64>, Option<DateTime<Utc>>) {
         u.as_ref()
-            .map(|v| (Some(v.utilization), Some(v.resets_at)))
+            .map(|v| (Some(v.utilization), v.resets_at))
             .unwrap_or((None, None))
     }
     fn ofe(e: &Option<ExtraUsage>) -> (Option<f64>, Option<DateTime<Utc>>) {
         e.as_ref()
-            .map(|v| (Some(v.utilization), v.resets_at))
+            .map(|v| (v.utilization, v.resets_at))
             .unwrap_or((None, None))
     }
     match bucket {
@@ -157,7 +157,7 @@ mod tests {
         UsageSnapshot {
             five_hour: Some(Utilization {
                 utilization: util,
-                resets_at: Utc::now() + Duration::hours(reset_in_hours),
+                resets_at: Some(Utc::now() + Duration::hours(reset_in_hours)),
             }),
             seven_day: None,
             seven_day_sonnet: None,
@@ -196,7 +196,7 @@ mod tests {
         let fresh_snap = UsageSnapshot {
             five_hour: Some(Utilization {
                 utilization: 80.0,
-                resets_at: later_reset,
+                resets_at: Some(later_reset),
             }),
             seven_day: None,
             seven_day_sonnet: None,
@@ -228,7 +228,7 @@ mod tests {
                 is_enabled: true,
                 monthly_limit_cents: 5000,
                 used_credits_cents: 3750,
-                utilization: 75.0,
+                utilization: Some(75.0),
                 resets_at: None,
             }),
             fetched_at: Utc::now(),

@@ -5,19 +5,28 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, specta::Type)]
 pub struct Utilization {
     pub utilization: f64,
-    #[specta(type = String)]
-    pub resets_at: DateTime<Utc>,
+    // The API returns `resets_at: null` for buckets that exist with
+    // `utilization: 0.0` but have no active window yet (e.g. an unused
+    // `seven_day_sonnet`). Keeping it required would fail the whole snapshot
+    // decode whenever any sibling bucket is idle.
+    #[serde(default)]
+    #[specta(type = Option<String>)]
+    pub resets_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, specta::Type)]
 pub struct ExtraUsage {
+    #[serde(default)]
     pub is_enabled: bool,
     #[serde(default)]
     pub monthly_limit_cents: u64,
     #[serde(default)]
     pub used_credits_cents: u64,
+    // Sent as `null` when extra usage is not enabled; `#[serde(default)]`
+    // alone would not cover that since the field is present-but-null.
     #[serde(default)]
-    pub utilization: f64,
+    pub utilization: Option<f64>,
+    #[serde(default)]
     #[specta(type = Option<String>)]
     pub resets_at: Option<DateTime<Utc>>,
 }

@@ -67,16 +67,27 @@ impl UsageClient {
         };
 
         match resp.status() {
-            StatusCode::OK => match resp.json::<UsageSnapshot>().await {
-                Ok(mut s) => {
-                    s.fetched_at = Utc::now();
-                    FetchOutcome::Ok(s)
+            StatusCode::OK => {
+                let bytes = match resp.bytes().await {
+                    Ok(b) => b,
+                    Err(e) => {
+                        tracing::warn!("usage fetch read body failed: {e}");
+                        return FetchOutcome::Transient(format!("read body: {e}"));
+                    }
+                };
+                match serde_json::from_slice::<UsageSnapshot>(&bytes) {
+                    Ok(mut s) => {
+                        s.fetched_at = Utc::now();
+                        FetchOutcome::Ok(s)
+                    }
+                    Err(e) => {
+                        let preview: String =
+                            String::from_utf8_lossy(&bytes).chars().take(512).collect();
+                        tracing::warn!("usage decode failed: {e}; body preview: {preview}");
+                        FetchOutcome::Transient(format!("decode: {e}"))
+                    }
                 }
-                Err(e) => {
-                    tracing::warn!("usage decode failed: {e}");
-                    FetchOutcome::Transient(format!("decode: {e}"))
-                }
-            },
+            }
             StatusCode::UNAUTHORIZED => {
                 tracing::warn!("usage fetch returned 401 unauthorized");
                 FetchOutcome::Unauthorized
