@@ -494,6 +494,21 @@ pub async fn swap_to_account(
         .await
         .map_err(|e| e.to_string())?;
 
+    // swap_to commits both CC creds and the global oauthAccount blob for
+    // `slot`; reconcile active_slot eagerly so the next list_accounts call
+    // (the UI hits this immediately after we return) sees correct is_active
+    // flags without waiting on the poll-loop tick.
+    *state.active_slot.write() = Some(slot);
+
+    // Drop per-slot backoff state. The previous backoff was earned by a
+    // different token (the prior active slot's live CC blob, or a stale
+    // OAuth refresh token) — a swap rotates which token authenticates each
+    // slot's usage fetch, so prior 429s no longer apply. Without this, an
+    // unlucky run of throttling can leave every slot waiting out a 30-min
+    // window with no successful fetch, which strands the popover on the
+    // empty LoadingShell because state.snapshot() has nothing to return.
+    state.backoff_by_slot.write().clear();
+
     if let Ok(Some(target)) = state.accounts.get(slot) {
         let prev = state.keychain_guardian.lock().replace(
             crate::auth::keychain_guardian::KeychainGuardian::arm_with_claude_code_creds(

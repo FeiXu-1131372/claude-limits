@@ -10,7 +10,6 @@ import './styles/tokens.css';
 
 export function App() {
   const init = useAppStore((s) => s.init);
-  const requiresSetup = useAppStore((s) => s.requiresSetup);
   const accounts = useAppStore((s) => s.accounts);
   const viewMode = useAppStore((s) => s.viewMode);
   const [initialized, setInitialized] = useState(false);
@@ -41,7 +40,14 @@ export function App() {
     );
   }
 
-  if (requiresSetup && accounts.length === 0) {
+  // No managed accounts → always route to AuthPanel. This covers both the
+  // first-run case (no live CC creds either) and the fresh-CC-login case
+  // (live creds exist but haven't been imported yet) — in the latter the
+  // "Use upstream's current login" tile in AuthPanel imports the live
+  // account in one click. Without this, the popover would render
+  // LoadingShell forever because state.snapshot() returns None until
+  // active_slot resolves to a managed slot.
+  if (accounts.length === 0) {
     return <AuthPanel />;
   }
 
