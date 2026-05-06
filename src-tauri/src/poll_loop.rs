@@ -1,4 +1,4 @@
-use crate::app_state::{AppState, BurnRateProjection, CachedUsage};
+use crate::app_state::{AppState, BackoffState, BurnRateProjection, CachedUsage};
 use crate::auth::AuthSource;
 use crate::notifier;
 use crate::tray;
@@ -8,7 +8,7 @@ use serde_json::json;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 
 static STALE_EMITTED: AtomicBool = AtomicBool::new(false);
@@ -63,27 +63,18 @@ async fn poll_all(
         }
     }
 
-    // 3. Fan out per-slot fetches in parallel, respecting per-slot backoff windows.
+    // 3. Fan out per-slot fetches in parallel, respecting per-slot backoff
+    //    deadlines. A slot is due when no entry exists or the deadline has
+    //    elapsed; entries are evicted lazily on the next successful fetch.
+    let now = Instant::now();
     let due_slots: Vec<u32> = accounts
         .iter()
         .filter(|a| {
             let backoff_map = state.backoff_by_slot.read();
-            // Treat backoff entries as "skip once" — cleared on successful poll
-            // or natural expiry below.
-            backoff_map.get(&a.slot).is_none()
+            backoff_map.get(&a.slot).is_none_or(|b| now >= b.until)
         })
         .map(|a| a.slot)
         .collect();
-
-    // Clear one backoff entry per skipped slot so they retry next tick.
-    {
-        let mut backoff_map = state.backoff_by_slot.write();
-        for a in &accounts {
-            if !due_slots.contains(&a.slot) {
-                backoff_map.remove(&a.slot);
-            }
-        }
-    }
 
     let fetches: Vec<_> = due_slots
         .iter()
@@ -185,14 +176,34 @@ async fn poll_all(
                 state.cached_usage_by_slot.write().insert(slot, entry);
             }
             FetchOutcome::RateLimited(retry_after) => {
-                let prev = state
+                let prev_delay = state
                     .backoff_by_slot
                     .read()
                     .get(&slot)
-                    .copied()
+                    .map(|b| b.last_delay)
                     .unwrap_or(Duration::from_secs(60));
-                let next = retry_after.unwrap_or_else(|| next_backoff(prev));
-                state.backoff_by_slot.write().insert(slot, next);
+                // Honor `Retry-After` only when it carries a positive value.
+                // The Anthropic usage endpoint has been observed returning
+                // `Retry-After: 0` on 429, which would let us hammer it on
+                // the next tick — fall back to exponential backoff there.
+                // Clamp explicit values into [60s, 30min] so a misconfigured
+                // server can't lock us out indefinitely or sub-minute-poll us.
+                let delay = match retry_after {
+                    Some(d) if d > Duration::ZERO => clamp_backoff(d),
+                    _ => next_backoff(prev_delay),
+                };
+                tracing::warn!(
+                    "slot {slot} rate-limited; backing off {:?} (server retry-after={:?})",
+                    delay,
+                    retry_after,
+                );
+                state.backoff_by_slot.write().insert(
+                    slot,
+                    BackoffState {
+                        until: Instant::now() + delay,
+                        last_delay: delay,
+                    },
+                );
                 let mut entry = state
                     .cached_usage_by_slot
                     .write()
@@ -214,6 +225,12 @@ async fn poll_all(
     }
 
     Ok(())
+}
+
+fn clamp_backoff(d: Duration) -> Duration {
+    let min = Duration::from_secs(60);
+    let max = Duration::from_secs(30 * 60);
+    d.clamp(min, max)
 }
 
 fn placeholder_cached(

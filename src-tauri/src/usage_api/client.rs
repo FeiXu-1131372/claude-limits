@@ -9,6 +9,7 @@ pub const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 pub const ANTHROPIC_BETA: &str = "oauth-2025-04-20";
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)] // UsageSnapshot is intentionally value-typed; boxing adds indirection for no benefit here
 pub enum FetchOutcome {
     Ok(UsageSnapshot),
     Unauthorized,
