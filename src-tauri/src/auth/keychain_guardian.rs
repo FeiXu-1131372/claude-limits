@@ -184,4 +184,25 @@ mod tests {
             "guardian must not write after deadline"
         );
     }
+
+    #[tokio::test(start_paused = true)]
+    async fn cancel_stops_writes_immediately() {
+        let io = MockIO::new(blob("rt-b"));
+        let g = KeychainGuardian::arm(blob("rt-b"), io.clone());
+
+        // Cancel at t+1s, before the first poll fires.
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        g.cancel();
+
+        // Drift in after cancel — guardian must not react.
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        *io.current.lock().unwrap() = Some(blob("rt-a"));
+        tokio::time::sleep(Duration::from_secs(10)).await;
+
+        assert_eq!(
+            io.writes.load(Ordering::SeqCst),
+            0,
+            "no writes should happen after cancel"
+        );
+    }
 }
