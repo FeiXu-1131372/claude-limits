@@ -30,7 +30,7 @@ impl KeychainGuardian {
     }
 
     pub fn cancel(self) {
-        self.cancel.notify_waiters();
+        self.cancel.notify_one();
     }
 }
 
