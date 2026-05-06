@@ -493,6 +493,18 @@ pub async fn swap_to_account(
         .swap_to(slot)
         .await
         .map_err(|e| e.to_string())?;
+
+    if let Ok(Some(target)) = state.accounts.get(slot) {
+        let prev = state.keychain_guardian.lock().replace(
+            crate::auth::keychain_guardian::KeychainGuardian::arm_with_claude_code_creds(
+                target.claude_code_oauth_blob.clone(),
+            ),
+        );
+        if let Some(p) = prev {
+            p.cancel();
+        }
+    }
+
     let running = process_detection::detect();
     state.force_refresh.notify_one();
     Ok(SwapReport {
