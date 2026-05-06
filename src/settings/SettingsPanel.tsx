@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { Toggle } from '../components/ui/Toggle';
 import { Slider } from '../components/ui/Slider';
-import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
 import { useAppStore } from '../lib/store';
-import { LogOut } from '../lib/icons';
 import type { Settings } from '../lib/types';
 import { enable as enableAutostart, disable as disableAutostart } from '@tauri-apps/plugin-autostart';
 
@@ -16,8 +15,7 @@ export function SettingsPanel() {
   const settings = useAppStore((s) => s.settings);
   const setSettings = useAppStore((s) => s.setSettings);
   const usage = useAppStore((s) => s.usage);
-  const hasClaudeCodeCreds = useAppStore((s) => s.hasClaudeCodeCreds);
-  const storeSignOut = useAppStore((s) => s.signOut);
+  const accounts = useAppStore((s) => s.accounts);
   const [local, setLocal] = useState<Settings | null>(() => settings);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -57,15 +55,12 @@ export function SettingsPanel() {
     }
   }
 
-  async function signOut() {
-    await storeSignOut();
-  }
-
   const authSourceLabel = (src: string) => src === 'ClaudeCode' ? 'Claude Code' : src;
+  const activeAccount = accounts.find((a) => a.is_active);
   const accountStatus = usage
     ? { connected: true, email: usage.account_email, source: authSourceLabel(usage.auth_source) }
-    : hasClaudeCodeCreds
-      ? { connected: true, email: null, source: 'Claude Code' }
+    : activeAccount
+      ? { connected: true, email: activeAccount.email, source: activeAccount.cached_usage ? authSourceLabel(activeAccount.cached_usage.auth_source) : 'Claude Code' }
       : { connected: false, email: null, source: null };
 
   return (
@@ -160,11 +155,10 @@ export function SettingsPanel() {
               </span>
               {accountStatus.source && <Badge variant="live">{accountStatus.source}</Badge>}
             </div>
-            {accountStatus.connected && (
-              <Button variant="ghost" size="sm" className="text-[color:var(--color-danger)]" onClick={signOut}>
-                <LogOut size={12} />
-                Sign out
-              </Button>
+            {!accountStatus.connected && (
+              <span className="text-[length:var(--text-micro)] text-[color:var(--color-text-muted)]">
+                Manage in Accounts
+              </span>
             )}
           </div>
         </Card>

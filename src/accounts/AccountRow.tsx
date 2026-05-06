@@ -80,7 +80,7 @@ export function AccountRow({ entry, thresholds, shareHint, onClick, onMenuOpen }
               <span className="w-[36px] text-[length:var(--text-micro)] mono text-right">
                 {Math.round(fiveHour.utilization)}%
               </span>
-              <ResetCountdown resetsAt={fiveHour.resets_at} compact />
+              {fiveHour.resets_at && <ResetCountdown resetsAt={fiveHour.resets_at} compact />}
             </div>
           )}
           {sevenDay && (
@@ -92,7 +92,7 @@ export function AccountRow({ entry, thresholds, shareHint, onClick, onMenuOpen }
               <span className="w-[36px] text-[length:var(--text-micro)] mono text-right">
                 {Math.round(sevenDay.utilization)}%
               </span>
-              <ResetCountdown resetsAt={sevenDay.resets_at} compact />
+              {sevenDay.resets_at && <ResetCountdown resetsAt={sevenDay.resets_at} compact />}
             </div>
           )}
           {shareHint && (
