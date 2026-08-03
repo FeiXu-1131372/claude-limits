@@ -71,8 +71,14 @@ pub fn extension_installed() -> bool {
 
 /// Resolve the `code` CLI. Kept separate from `is_available` so the reason a
 /// launch is impossible can be reported precisely.
+///
+/// Not a bare `which`: a macOS `.app` inherits launchd's minimal `PATH`, on
+/// which even the standard `/usr/local/bin/code` symlink is invisible. The
+/// candidate list also reaches the CLI inside the VS Code bundle, so the tab
+/// surface is offered to users who never ran "Shell Command: Install 'code'
+/// command in PATH".
 pub fn code_path() -> Option<PathBuf> {
-    which::which("code").ok()
+    super::discover::find("code", &super::discover::code_candidates())
 }
 
 /// A VS Code tab is only offerable when both halves are present: the CLI to

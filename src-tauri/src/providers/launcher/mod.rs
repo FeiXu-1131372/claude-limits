@@ -7,6 +7,7 @@
 //! process arguments — command lines are world-readable via `ps` on macOS
 //! and Task Manager / WMI on Windows.
 
+pub mod discover;
 pub mod script;
 pub mod vscode;
 
@@ -161,9 +162,12 @@ pub fn available_terminals() -> Vec<Terminal> {
     CANDIDATES.iter().copied().filter(|t| is_installed(*t)).collect()
 }
 
+/// A bare `which` is not enough here: a macOS `.app` inherits launchd's
+/// `PATH=/usr/bin:/bin:/usr/sbin:/sbin`, which contains no Claude Code install
+/// location at all. See `discover` for the full story.
 pub fn resolve_claude_binary() -> Result<PathBuf> {
-    which::which("claude").map_err(|_| {
-        anyhow!("could not find the `claude` executable on PATH — install Claude Code, or make sure it is on PATH for GUI apps")
+    discover::find("claude", &discover::claude_candidates()).ok_or_else(|| {
+        anyhow!("could not find the `claude` executable — install Claude Code, or run `claude` once in a terminal to confirm it is on your shell's PATH")
     })
 }
 
