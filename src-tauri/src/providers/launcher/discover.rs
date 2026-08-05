@@ -36,6 +36,7 @@
 
 use std::path::{Path, PathBuf};
 
+#[cfg(target_os = "macos")]
 fn home() -> Option<PathBuf> {
     std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
@@ -222,6 +223,7 @@ pub fn find(binary: &str, candidates: &[PathBuf]) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use tempfile::tempdir;
 
     #[cfg(unix)]
