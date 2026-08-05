@@ -2,6 +2,14 @@
 
 Before tagging a release, complete every item on both macOS and Windows.
 
+## Before running `node scripts/release.mjs`
+
+- [ ] `CHANGELOG.md`'s `[Unreleased]` section reads the way you want it to appear on the
+      GitHub release page — the script promotes it verbatim to `## vX.Y.Z — <today>` and
+      opens a fresh empty `[Unreleased]` above it. It refuses to run if an entry for the
+      target version already exists, but it does not check that `[Unreleased]` has content;
+      an empty section promotes to an empty (but present) version heading.
+
 ## macOS (14+)
 - [ ] Fresh install (download `.dmg`, drag to Applications, remove quarantine)
 - [ ] OAuth paste-back: click "Sign in with Claude", complete in browser, paste `code#state`, verify usage loads
