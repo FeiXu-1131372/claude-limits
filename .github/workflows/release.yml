@@ -2,6 +2,11 @@ name: release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build (dry run — inspect output, do not publish)'
+        required: true
 
 # Required so the workflow's GITHUB_TOKEN can create the release record and
 # upload bundle artifacts to it. Repository-default token permissions are
@@ -55,8 +60,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: ${{ github.ref_name }}
+          tagName: ${{ inputs.tag || github.ref_name }}
+          releaseName: ${{ inputs.tag || github.ref_name }}
           releaseBody: 'Unsigned build — see README for first-launch instructions on each OS.'
           args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
           includeUpdaterJson: true
