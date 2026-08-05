@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## v1.3.1 — 2026-08-04
+
+### Fixed
+
+- **Launching a session did nothing on macOS.** A bundled `.app` is started by launchd, which hands it a bare `PATH` (`/usr/bin:/bin:/usr/sbin:/sbin`) — every location Claude Code or the `code` CLI actually installs into (`~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, `~/.claude/local`, VS Code's own bin) was outside it, so the launcher couldn't find either binary and no session could start. Windows was unaffected (a GUI process there inherits the full registry PATH) and the bug was invisible in `tauri dev` (which inherits a real terminal PATH), which is how it reached a release. Resolution now checks the inherited PATH, then the locations these tools actually install into, then falls back to the login shell's own PATH for nvm/asdf/fnm installs.
+
+## v1.3.0 — 2026-07-31
+
 ### Added
 
 - **Custom model providers.** Run Claude Code against third-party Anthropic-compatible endpoints (GLM, Kimi, DeepSeek, MiniMax, OpenRouter, or a custom URL) by launching provider-scoped terminal sessions from the new Providers tab. Sessions use per-process environment variables, so several providers can run at once and your own launch scripts keep working.
@@ -160,7 +168,9 @@ First public release. See the [GitHub release notes](https://github.com/FeiXu-11
 - Settings persistence via SQLite; CSP set; corrupted-DB recovery.
 - Anthropic-warm token system with native vibrancy (macOS) / Mica (Windows 11) / translucent solid (Windows 10).
 
-[Unreleased]: https://github.com/FeiXu-1131372/claude-switchboard/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/FeiXu-1131372/claude-switchboard/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/FeiXu-1131372/claude-switchboard/compare/v1.3.0...v1.3.1
+[1.3.0]: https://github.com/FeiXu-1131372/claude-switchboard/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/FeiXu-1131372/claude-switchboard/compare/v1.1.3...v1.2.0
 [1.1.0]: https://github.com/FeiXu-1131372/claude-switchboard/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/FeiXu-1131372/claude-switchboard/releases/tag/v1.0.0
