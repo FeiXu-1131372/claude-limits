@@ -1,11 +1,15 @@
 # Claude Switchboard
 
-**Know where you stand. Switch who's signed in. Decide when your 5-hour window starts. All from your menu bar.**
+[![CI](https://github.com/FeiXu-1131372/claude-switchboard/actions/workflows/test.yml/badge.svg)](https://github.com/FeiXu-1131372/claude-switchboard/actions/workflows/test.yml)
+[![Latest release](https://img.shields.io/github/v/release/FeiXu-1131372/claude-switchboard)](https://github.com/FeiXu-1131372/claude-switchboard/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Switchboard is a native menu-bar control plane for your Claude rate limits and accounts. One glance tells you what's left in the 5-hour and 7-day windows. One click swaps which account Claude Code is using. One toggle starts a fresh 5-hour bucket on your schedule, not whenever you happened to fire your first prompt.
+**Know where you stand. Switch who's signed in. Run against any endpoint. Pick up where you left off. All from your menu bar.**
+
+Switchboard is a native menu-bar control plane for your Claude rate limits, accounts, model providers, and session history. One glance tells you what's left in the 5-hour and 7-day windows. One click swaps which account Claude Code is using, launches a session against a third-party endpoint, or resumes a past session. One toggle starts a fresh 5-hour bucket on your schedule, not whenever you happened to fire your first prompt.
 
 <p align="center">
-  <img src="docs/screenshots/macos-popover.png" alt="Compact popover — 5H and 7D buckets with reset times, burn-rate projection, per-model bars, and pay-as-you-go credits" width="380" />
+  <img src="docs/screenshots/macos-popover.png" alt="Compact popover — 5H and 7D hero numbers with reset countdowns, burn-rate projection, and a Details disclosure" width="380" />
 </p>
 
 ---
@@ -26,8 +30,11 @@ The compact popover gives you everything you need to decide "can I keep coding?"
 
 - **5H / 7D bars** with absolute reset times (`in 19m`, `in 46h 9m`) — never math-on-the-fly
 - **Burn-rate projection** — `→ ~26% by reset` extrapolates from your current pace
-- **Per-model bars** — see Opus vs Sonnet split at a glance
-- **Pay-as-you-go credits** — when enabled, with its own utilization bar
+- **Details disclosure** — expand for the Opus/Sonnet split and pay-as-you-go credits, when your plan reports them (Pro and Team-Pro share a single combined 7-day quota, so those rows don't apply there)
+
+<p align="center">
+  <img src="docs/screenshots/macos-popover-details.png" alt="Popover with Details expanded — the pay-as-you-go row, shown only when the plan reports it" width="380" />
+</p>
 
 ---
 
@@ -81,6 +88,50 @@ Schedules fire via the OS (launchd on macOS, Task Scheduler on Windows) so they 
 
 ---
 
+## Point Claude Code at any endpoint
+
+**Run Claude Code against GLM, Kimi, DeepSeek, MiniMax, OpenRouter, or your own endpoint — one session at a time, without touching your shell.**
+
+<p align="center">
+  <img src="docs/screenshots/macos-providers.png" alt="Providers tab — the official Anthropic row plus two third-party endpoints, each with its model badge, a Set default action, and a Launch button" width="880" />
+</p>
+
+Add a provider from a preset — GLM (z.ai), Kimi, DeepSeek, MiniMax, OpenRouter — or point it at a custom base URL. Every preset pins *all* the `/model` aliases and the context-window knobs, because an unset alias resolves to a first-party Anthropic id the endpoint cannot serve.
+
+<p align="center">
+  <img src="docs/screenshots/macos-provider-presets.png" alt="Add provider dialog with the preset menu open — GLM, Kimi, DeepSeek, MiniMax, OpenRouter, or a custom endpoint" width="880" />
+</p>
+
+"Launch opens a terminal with this provider's credentials scoped to that one session. Nothing global changes, so several providers can run side by side" — and your own launch scripts keep working alongside it, since everything is per-process environment variables, never a global rewrite.
+
+A provider can also be set as the **default** for bare `claude` invocations. Turning that on writes `~/.claude/settings.json` — Switchboard backs the file up first, records an undo manifest, and asks before overwriting any `ANTHROPIC_*` keys it didn't write. Turning it off restores your values and tells you which of your own edits it deliberately left alone. Which terminal launches (and which app, on Windows) is a preference in Settings, scoped to whichever terminals are actually installed.
+
+---
+
+## Pick up where you left off
+
+**Every past Claude Code session, with its own end-of-session recap, one click from resuming.**
+
+<p align="center">
+  <img src="docs/screenshots/macos-sessions-list.png" alt="Sessions tab — past Claude Code sessions grouped by project, each row showing branch, turn count, model, tokens, cost, and age" width="880" />
+</p>
+
+Sessions are grouped by project, newest first, and searchable across titles, recaps, and touched files. Expand any row for Claude Code's own end-of-session recap — what you asked, where you left off, which files it touched, peak context usage with a fill bar, and the permission mode Resume will re-apply.
+
+<p align="center">
+  <img src="docs/screenshots/macos-sessions-recap.png" alt="An expanded session card — Claude Code's own end-of-session recap, what was asked, where it was left off, which files it touched, peak context usage, and the permission mode resume will re-apply" width="880" />
+</p>
+
+Resume in a terminal, or as a Claude Code tab in a new VS Code window. The terminal path carries the provider's CLI flags and the session's permission mode; a VS Code tab carries the provider's credentials but not the flags or the mode — the extension builds its own argv, and the app says so rather than letting a `bypassPermissions` session come back up asking for permission with no explanation.
+
+<p align="center">
+  <img src="docs/screenshots/macos-resume-surfaces.png" alt="The Resume control splitting into two surfaces on hover — a terminal window or a Claude Code tab in VS Code" width="760" />
+</p>
+
+Resuming always forks (`--fork-session`), so a session still open elsewhere is never disturbed. If the project folder is gone, Resume is disabled with a reason instead of failing silently.
+
+---
+
 ## Onboard in seconds
 
 **Import the account `claude` is already signed into, or sign in fresh — either way, two clicks.**
@@ -103,6 +154,24 @@ Credentials live in your OS keychain. They never leave the device. Switchboard n
 
 ---
 
+## Cost and Trends, broken down
+
+**The token/cost tab from earlier versions is now called Cost — Sessions now means the session browser above.**
+
+<p align="center">
+  <img src="docs/screenshots/macos-cost.png" alt="Cost tab — sessions grouped by day with per-session tokens and cost, headless runs visually demoted" width="880" />
+</p>
+
+Cost groups sessions by day, rolls subagent runs into their parent conversation, and visually demotes headless or scheduled runs instead of showing a broken-looking blank row.
+
+<p align="center">
+  <img src="docs/screenshots/macos-trends-day.png" alt="Trends tab with a day selected — that day's per-model token, cost, and cache breakdown, sorted by cost" width="880" />
+</p>
+
+Trends charts your usage over time — click any day to see that day's per-model token, cost, and cache breakdown, sorted by cost. The whole window loads with the chart, so opening a day is instant.
+
+---
+
 ## Also on Windows
 
 **Same layout, same interactions, same design language. Rendered with Mica on Windows 11 and a translucent fallback on Windows 10.**
@@ -117,7 +186,7 @@ Credentials live in your OS keychain. They never leave the device. Switchboard n
   <img src="docs/screenshots/windows-popover.png" alt="Compact popover on Windows" width="380" />
 </p>
 
-The full report has six tabs — Sessions, Models, Trends, Projects, Heatmap, Cache — sourced from your local Claude Code JSONL transcripts.
+The full report has eight tabs — Sessions, Cost, Models, Trends, Projects, Heatmap, Cache, Providers — sourced from your local Claude Code JSONL transcripts.
 
 <p align="center">
   <img src="docs/screenshots/windows-expanded-models.png" alt="Expanded report — Models tab with per-model token breakdown" width="720" />
@@ -140,6 +209,8 @@ The full report has six tabs — Sessions, Models, Trends, Projects, Heatmap, Ca
 | **Tier-aware cost** | Sonnet 4 1M-context tier + 5m/1h cache writes calculated correctly | Often approximated |
 | **Cross-platform** | macOS + Windows 10/11, same design | Usually macOS-only |
 | **Privacy** | Local-only. No telemetry. | Varies |
+| **Third-party endpoints** | Per-session launch against GLM/Kimi/DeepSeek/MiniMax/OpenRouter, or a global default | Not supported |
+| **Session resume** | Past sessions with recaps; resume into a terminal or a VS Code tab, always forked | Not supported |
 
 ---
 
@@ -149,8 +220,11 @@ The full report has six tabs — Sessions, Models, Trends, Projects, Heatmap, Ca
 - **Multi-account, one-click swap** — every account in one popover, click to switch, running sessions adopt in ~30s
 - **Burn-rate projection** — extrapolates your pace and color-cues against your threshold
 - **Threshold notifications** — warn / danger levels you choose; one alert per bucket cycle
-- **Six-tab expanded report** — Sessions, Models, Trends, Projects, Heatmap, Cache
+- **Eight-tab expanded report** — Sessions, Cost, Models, Trends, Projects, Heatmap, Cache, Providers
 - **Tier-aware cost math** — Sonnet 4's 1M-context tier and the 5-minute / 1-hour cache write split
+- **Custom model providers** — launch Claude Code against GLM, Kimi, DeepSeek, MiniMax, OpenRouter, or a custom endpoint, per-session or as a global default
+- **Session browser + resume** — every past session with its own recap, one click from resuming into a terminal or a VS Code tab, always forked
+- **Trends day breakdown** — click any day for its per-model token, cost, and cache split
 - **Warm-up & scheduling** — manual or OS-scheduled, strictly opt-in, ~$0.013/account/year
 - **Auto-update** — checks every 6h, signed with ed25519, single-click install
 - **Cross-platform** — macOS (vibrancy) and Windows 10/11 (Mica / acrylic)
@@ -223,13 +297,15 @@ Your old install is preserved — you can launch the legacy `Claude Limits.app` 
 ## Privacy
 
 - All data stays on your machine. Usage history is in SQLite at `~/Library/Application Support/com.claude-switchboard.ClaudeSwitchboard/data.db` (macOS) or the platform equivalent on Windows.
-- The only outbound traffic is to Anthropic's official API.
-- No telemetry, no analytics, no third-party services.
+- With no custom provider configured, the only outbound traffic is to Anthropic's official API.
+- **Third-party providers are third parties.** When you launch a session against a custom provider, your prompts go to that provider's endpoint — `api.z.ai`, `api.kimi.com`, `api.deepseek.com`, `api.minimax.io`, `openrouter.ai`, or whatever base URL you enter — not to Anthropic. Switchboard stores the API key you give it locally alongside your usage database and sends it only to that endpoint.
+- **Setting a global default writes one file.** Choosing a provider as the default for bare `claude` invocations writes `~/.claude/settings.json`. Switchboard backs the file up first, records an undo manifest, asks before overwriting `ANTHROPIC_*` keys it did not write, and on removal restores your values — telling you which of your own edits it deliberately left in place.
+- No telemetry, no analytics — Switchboard itself never phones home.
 - **Opt-in warm-up:** With your explicit per-account consent, Switchboard can send 1-token warm-up messages to `/v1/messages` to start the 5-hour window deliberately. No other content is ever sent. Off by default; revocable any time.
 
 ## Stack
 
-Tauri v2 (Rust + WebView) · React 19 · TypeScript · Tailwind CSS v4 · Framer Motion · Recharts · SQLite.
+Tauri v2 (Rust + WebView) · React 19 · TypeScript · Tailwind CSS v4 · Framer Motion · Recharts · Zustand · lucide-react · SQLite.
 
 ## Development
 
@@ -237,7 +313,10 @@ Tauri v2 (Rust + WebView) · React 19 · TypeScript · Tailwind CSS v4 · Framer
 # Frontend typecheck
 pnpm exec tsc --noEmit
 
-# Backend tests (75+ unit + integration tests)
+# Frontend tests (Vitest)
+pnpm test
+
+# Backend tests (Rust unit + integration)
 cd src-tauri && cargo test
 ```
 
