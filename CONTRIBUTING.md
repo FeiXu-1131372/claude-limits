@@ -27,7 +27,7 @@ cargo test --all-features
 cargo clippy --all-targets -- -D warnings
 ```
 
-All four must pass. `test.yml` runs this matrix on macOS, Windows, and Linux (Linux for the Rust suite only — this is a desktop app with no Linux build target).
+All four must pass. `test.yml` runs the full matrix — frontend and Rust — on macOS, Windows, and Linux, even though this is a desktop app with no Linux build target: it's cheap insurance against platform-`cfg`-gated Rust code that only breaks on the OS where it compiles.
 
 ## Scope
 
