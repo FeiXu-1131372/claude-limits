@@ -1,0 +1,54 @@
+name: Bug report
+description: Something isn't working as expected
+labels: [bug]
+body:
+  - type: input
+    id: os-version
+    attributes:
+      label: OS and version
+      description: e.g. macOS 15.1, Windows 11 24H2, Windows 10 22H2
+      placeholder: macOS 15.1
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: Switchboard version
+      description: Shown in the popover footer, or in About
+      placeholder: v1.3.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Install method
+      options:
+        - Downloaded release (.dmg / .exe)
+        - Built from source (pnpm tauri dev / build)
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Logs, screenshots, number of accounts/providers configured, etc.
+    validations:
+      required: false
