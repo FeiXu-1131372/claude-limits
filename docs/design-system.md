@@ -291,7 +291,7 @@ src/
 
 ## Screenshots
 
-See `concepts/popover-final.html` and `concepts/report-final.html` for browser-renderable previews of the two primary screens.
+See `docs/design/popover-final.html` and `docs/design/report-final.html` for browser-renderable previews of the two primary screens.
 
 ## Design Philosophy
 
